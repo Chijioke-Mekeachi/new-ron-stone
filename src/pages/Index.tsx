@@ -7,10 +7,13 @@ import Features from "@/components/Features";
 import Statistics from "@/components/Statistics";
 import Testimonials from "@/components/Testimonials";
 import Footer from "@/components/Footer";
+import Preloader from "@/components/Preloader";
+import ChatWidget from "@/components/ChatWidget";
 
 const Index = () => {
   return (
     <div className="min-h-screen">
+      <Preloader />
       <Navbar />
       <Hero />
       <WhyChoose />
@@ -20,6 +23,7 @@ const Index = () => {
       <Statistics />
       <Testimonials />
       <Footer />
+      <ChatWidget />
     </div>
   );
 };
