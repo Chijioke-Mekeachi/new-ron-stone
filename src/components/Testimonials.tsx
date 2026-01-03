@@ -1,46 +1,55 @@
 import { Star } from "lucide-react";
-
-const testimonials = [
-  {
-    name: "Sarah Mitchell",
-    role: "Digital Entrepreneur",
-    content: "Ron Stone Bank transformed how I manage my international business. The multi-currency accounts and instant transfers are game-changers. I've saved thousands in fees.",
-    rating: 5,
-    avatar: "SM",
-  },
-  {
-    name: "David Chen",
-    role: "Software Engineer",
-    content: "The mobile app is incredibly intuitive and the security features give me peace of mind. Opening my account took just 3 minutes. This is banking done right.",
-    rating: 5,
-    avatar: "DC",
-  },
-  {
-    name: "Emma Rodriguez",
-    role: "Travel Blogger",
-    content: "As someone who travels constantly, having access to local currencies without the crazy exchange fees has been incredible. The customer support is also top-notch.",
-    rating: 5,
-    avatar: "ER",
-  },
-  {
-    name: "James Wilson",
-    role: "Small Business Owner",
-    content: "Switching to Ron Stone Bank was the best financial decision for my business. The transparent pricing and powerful features help me focus on growth, not banking headaches.",
-    rating: 5,
-    avatar: "JW",
-  },
-];
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Testimonials = () => {
+  const { t } = useLanguage();
+
+  const testimonials = [
+    {
+      name: "Sarah Mitchell",
+      role: t('testimonials.role1'),
+      content: t('testimonials.content1'),
+      rating: 5,
+      avatar: "SM",
+    },
+    {
+      name: "David Chen",
+      role: t('testimonials.role2'),
+      content: t('testimonials.content2'),
+      rating: 5,
+      avatar: "DC",
+    },
+    {
+      name: "Emma Rodriguez",
+      role: t('testimonials.role3'),
+      content: t('testimonials.content3'),
+      rating: 5,
+      avatar: "ER",
+    },
+    {
+      name: "James Wilson",
+      role: t('testimonials.role4'),
+      content: t('testimonials.content4'),
+      rating: 5,
+      avatar: "JW",
+    },
+  ];
+
   return (
     <section className="py-20 lg:py-32" id="about">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
-            Loved by <span className="text-gradient-gold">Customers</span> Everywhere
+            {t('testimonials.title').split('Customers').map((part, i) => 
+              i === 0 ? (
+                <span key={i}>{part}<span className="text-gradient-gold">Customers</span></span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}
           </h2>
           <p className="text-lg text-muted-foreground">
-            Don't just take our word for it. Here's what our customers have to say about their experience.
+            {t('testimonials.subtitle')}
           </p>
         </div>
 

@@ -16,6 +16,7 @@ interface AuthContextType {
   signup: (email: string, password: string, firstName: string, lastName: string) => boolean;
   logout: () => void;
   updateBalance: (amount: number) => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,26 +48,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       firstName,
       lastName,
       accountNumber: `RSB${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-      balance: 50000.00,
+      balance: 25000.00,
       currency: 'USD'
     };
 
     users.push({ ...newUser, password });
     localStorage.setItem('users', JSON.stringify(users));
-    
-    // Also initialize transactions for new user
-    const transactions = JSON.parse(localStorage.getItem('transactions') || '{}');
-    transactions[newUser.id] = [
-      {
-        id: '1',
-        date: new Date().toISOString(),
-        type: 'credit',
-        amount: 50000,
-        status: 'completed',
-        description: 'Welcome bonus'
-      }
-    ];
-    localStorage.setItem('transactions', JSON.stringify(transactions));
     
     setUser(newUser);
     return true;
@@ -103,8 +90,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      
+      // Update in localStorage
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const index = users.findIndex((u: any) => u.id === user.id);
+      if (index !== -1) {
+        users[index] = { ...users[index], ...updates };
+        localStorage.setItem('users', JSON.stringify(users));
+      }
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updateBalance }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, updateBalance, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

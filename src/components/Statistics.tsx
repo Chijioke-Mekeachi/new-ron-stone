@@ -1,23 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { Users, Globe, Clock, Award } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Stat {
   icon: typeof Users;
   value: number;
   suffix: string;
-  label: string;
+  labelKey: string;
 }
-
-const stats: Stat[] = [
-  { icon: Award, value: 10, suffix: "+", label: "Years in Digital Banking" },
-  { icon: Users, value: 1.5, suffix: "M+", label: "Active Users" },
-  { icon: Globe, value: 120, suffix: "+", label: "Supported Countries" },
-  { icon: Clock, value: 24, suffix: "/7", label: "Global Support" },
-];
 
 const Statistics = () => {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
+
+  const stats: Stat[] = [
+    { icon: Award, value: 10, suffix: "+", labelKey: "stats.years" },
+    { icon: Users, value: 1.5, suffix: "M+", labelKey: "stats.users" },
+    { icon: Globe, value: 120, suffix: "+", labelKey: "stats.countries" },
+    { icon: Clock, value: 24, suffix: "/7", labelKey: "stats.support" },
+  ];
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -45,10 +47,16 @@ const Statistics = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
-            Trusted by <span className="text-accent">Millions</span> Worldwide
+            {t('stats.title').split('Millions').map((part, i) => 
+              i === 0 ? (
+                <span key={i}>{part}<span className="text-accent">Millions</span></span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}
           </h2>
           <p className="text-lg text-primary-foreground/80">
-            Join a global community of users who trust Ron Stone Bank for their financial needs.
+            {t('stats.subtitle')}
           </p>
         </div>
 
@@ -61,7 +69,7 @@ const Statistics = () => {
                 icon={Icon}
                 value={stat.value}
                 suffix={stat.suffix}
-                label={stat.label}
+                label={t(stat.labelKey)}
                 isVisible={isVisible}
                 delay={index * 0.2}
               />

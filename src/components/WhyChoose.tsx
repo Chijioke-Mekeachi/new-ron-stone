@@ -1,39 +1,47 @@
 import { Globe, Zap, DollarSign, HeadphonesIcon } from "lucide-react";
-
-const features = [
-  {
-    icon: Globe,
-    title: "Instant Global Transfers",
-    description: "Send money across borders in seconds with real-time exchange rates and zero delays.",
-  },
-  {
-    icon: Zap,
-    title: "Multi-Currency Accounts",
-    description: "Hold, exchange, and spend in 50+ currencies with a single account and competitive rates.",
-  },
-  {
-    icon: DollarSign,
-    title: "Zero Hidden Fees",
-    description: "Transparent pricing with no monthly charges, no minimum balance, and no surprise costs.",
-  },
-  {
-    icon: HeadphonesIcon,
-    title: "24/7 Global Support",
-    description: "Expert support team available around the clock in multiple languages to assist you.",
-  },
-];
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const WhyChoose = () => {
+  const { t } = useLanguage();
+
+  const features = [
+    {
+      icon: Globe,
+      title: t('why.instant.title'),
+      description: t('why.instant.desc'),
+    },
+    {
+      icon: Zap,
+      title: t('why.multicurrency.title'),
+      description: t('why.multicurrency.desc'),
+    },
+    {
+      icon: DollarSign,
+      title: t('why.zerofees.title'),
+      description: t('why.zerofees.desc'),
+    },
+    {
+      icon: HeadphonesIcon,
+      title: t('why.support.title'),
+      description: t('why.support.desc'),
+    },
+  ];
+
   return (
     <section className="py-20 lg:py-32 bg-secondary/50" id="personal">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
-            Why Choose <span className="text-gradient-gold">Ron Stone Bank</span>
+            {t('why.title').split('Ron Stone Bank').map((part, i) => 
+              i === 0 ? (
+                <span key={i}>{part}<span className="text-gradient-gold">Ron Stone Bank</span></span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}
           </h2>
           <p className="text-lg text-muted-foreground">
-            Experience banking that works as hard as you do. Built for the global citizen, 
-            designed for simplicity, secured by industry-leading technology.
+            {t('why.subtitle')}
           </p>
         </div>
 

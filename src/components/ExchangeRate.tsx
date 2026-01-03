@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Bell } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const currencies = [
   { code: "USD", name: "US Dollar", rate: 1.0, change: 0 },
@@ -13,6 +14,7 @@ const currencies = [
 
 const ExchangeRate = () => {
   const [selectedCurrency, setSelectedCurrency] = useState("EUR");
+  const { t } = useLanguage();
 
   return (
     <section className="py-20 lg:py-32 bg-gradient-to-br from-primary via-navy-light to-primary text-primary-foreground">
@@ -20,10 +22,16 @@ const ExchangeRate = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 animate-fade-up">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
-              Live <span className="text-accent">Exchange Rates</span>
+              {t('exchange.title').split('Exchange Rates').map((part, i) => 
+                i === 0 ? (
+                  <span key={i}>{part}<span className="text-accent">Exchange Rates</span></span>
+                ) : (
+                  <span key={i}>{part}</span>
+                )
+              )}
             </h2>
             <p className="text-lg text-primary-foreground/80">
-              Real-time currency rates updated every second. Exchange with confidence.
+              {t('exchange.subtitle')}
             </p>
           </div>
 
@@ -73,7 +81,7 @@ const ExchangeRate = () => {
                 <div className="bg-primary-foreground/5 rounded-2xl p-6 border border-primary-foreground/10">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <p className="text-sm text-primary-foreground/60">USD to {selectedCurrency}</p>
+                      <p className="text-sm text-primary-foreground/60">USD {t('exchange.to')} {selectedCurrency}</p>
                       <p className="text-3xl font-bold text-accent mt-1">
                         {currencies.find((c) => c.code === selectedCurrency)?.rate.toFixed(4)}
                       </p>
@@ -101,7 +109,7 @@ const ExchangeRate = () => {
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
                 >
                   <Bell className="w-5 h-5 mr-2" />
-                  Set Rate Alert
+                  {t('exchange.setAlert')}
                 </Button>
               </div>
             </div>

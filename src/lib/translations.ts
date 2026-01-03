@@ -76,17 +76,29 @@ export const translations: Record<Language, Record<string, string>> = {
     'features.api.desc': 'Integrate banking features into your business with our robust API.',
     
     // Statistics
+    'stats.title': 'Trusted by Millions Worldwide',
+    'stats.subtitle': 'Join a global community of users who trust Ron Stone Bank.',
     'stats.years': 'Years in Digital Banking',
     'stats.users': 'Active Users',
     'stats.countries': 'Supported Countries',
     'stats.support': 'Global Support',
     
     // Testimonials
-    'testimonials.title': 'Trusted by Millions Worldwide',
+    'testimonials.title': 'Loved by Customers Everywhere',
     'testimonials.subtitle': 'See what our customers say about us',
+    'testimonials.role1': 'Digital Entrepreneur',
+    'testimonials.content1': 'Ron Stone Bank transformed how I manage my international business. The multi-currency accounts and instant transfers are game-changers.',
+    'testimonials.role2': 'Software Engineer',
+    'testimonials.content2': 'The mobile app is incredibly intuitive and the security features give me peace of mind. Opening my account took just 3 minutes.',
+    'testimonials.role3': 'Travel Blogger',
+    'testimonials.content3': 'As someone who travels constantly, having access to local currencies without the crazy exchange fees has been incredible.',
+    'testimonials.role4': 'Small Business Owner',
+    'testimonials.content4': 'Switching to Ron Stone Bank was the best financial decision for my business. The transparent pricing helps me focus on growth.',
     
     // Footer
     'footer.tagline': 'Your trusted digital banking partner for the modern world',
+    'footer.company': 'Company',
+    'footer.products': 'Products',
     'footer.about': 'About',
     'footer.careers': 'Careers',
     'footer.press': 'Press',
@@ -97,6 +109,35 @@ export const translations: Record<Language, Record<string, string>> = {
     'footer.privacy': 'Privacy Policy',
     'footer.terms': 'Terms of Service',
     'footer.rights': 'All rights reserved.',
+    'footer.emailUs': 'Email Us',
+    'footer.callUs': 'Call Us',
+    'footer.visitUs': 'Visit Us',
+    'footer.disclaimer': 'Ron Stone Bank is a licensed financial institution. Deposits are insured up to applicable limits.',
+    
+    // Hero extras
+    'hero.trusted': 'Trusted by 1.5M+ users worldwide',
+    'hero.instant': 'Instant Transfers',
+    'hero.security': 'Bank-Level Security',
+    'hero.countries': '120+ Countries',
+    
+    // Services extras
+    'services.transfer.title': 'Real-Time Transfers',
+    'services.transfer.desc': 'Send money anywhere in the world instantly with the best exchange rates and lowest fees.',
+    'services.savings.title': 'Smart Savings',
+    'services.savings.desc': 'Grow your wealth with high-yield savings accounts and automated investment portfolios.',
+    'services.security.title': 'Bank-Grade Security',
+    'services.security.desc': 'Military-grade encryption, biometric authentication, and 24/7 fraud monitoring protection.',
+    'services.mobile.title': 'Mobile-First Experience',
+    'services.mobile.desc': 'Full banking control at your fingertips with our award-winning mobile app.',
+    'services.cta': 'Explore All Features',
+    
+    // Features extras
+    'features.cards.title': 'Smart Cards',
+    'features.cards.desc': 'Physical and virtual cards with contactless payments and Apple Pay.',
+    'features.appTitle': 'Experience the Ron Stone Bank App',
+    'features.appTransactions': 'Transaction History',
+    'features.appSendMoney': 'Send Money',
+    'features.appWallet': 'Multi-Currency Wallet',
     
     // Auth
     'auth.signup.title': 'Create Your Account',
