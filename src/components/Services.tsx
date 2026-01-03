@@ -1,50 +1,59 @@
 import { CreditCard, Wallet, Send, Shield, TrendingUp, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const services = [
-  {
-    icon: Wallet,
-    title: "Digital Banking",
-    description: "Open a premium digital account in minutes with no paperwork. Manage everything from your phone.",
-  },
-  {
-    icon: CreditCard,
-    title: "Virtual & Physical Cards",
-    description: "Get instant virtual cards and premium metal cards with cashback rewards on every purchase.",
-  },
-  {
-    icon: Send,
-    title: "Real-Time Transfers",
-    description: "Send money anywhere in the world instantly with the best exchange rates and lowest fees.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Smart Savings & Investments",
-    description: "Grow your wealth with high-yield savings accounts and automated investment portfolios.",
-  },
-  {
-    icon: Shield,
-    title: "Bank-Grade Security",
-    description: "Military-grade encryption, biometric authentication, and 24/7 fraud monitoring protection.",
-  },
-  {
-    icon: Smartphone,
-    title: "Mobile-First Experience",
-    description: "Full banking control at your fingertips with our award-winning mobile app.",
-  },
-];
+import { Link } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Services = () => {
+  const { t } = useLanguage();
+
+  const services = [
+    {
+      icon: Wallet,
+      title: t('services.banking.title'),
+      description: t('services.banking.desc'),
+    },
+    {
+      icon: CreditCard,
+      title: t('services.cards.title'),
+      description: t('services.cards.desc'),
+    },
+    {
+      icon: Send,
+      title: t('services.transfer.title'),
+      description: t('services.transfer.desc'),
+    },
+    {
+      icon: TrendingUp,
+      title: t('services.savings.title'),
+      description: t('services.savings.desc'),
+    },
+    {
+      icon: Shield,
+      title: t('services.security.title'),
+      description: t('services.security.desc'),
+    },
+    {
+      icon: Smartphone,
+      title: t('services.mobile.title'),
+      description: t('services.mobile.desc'),
+    },
+  ];
+
   return (
     <section className="py-20 lg:py-32" id="business">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
-            Complete <span className="text-gradient-gold">Banking Solutions</span>
+            {t('services.title').split('Banking Solutions').map((part, i) => 
+              i === 0 ? (
+                <span key={i}>{part}<span className="text-gradient-gold">Banking Solutions</span></span>
+              ) : (
+                <span key={i}>{part}</span>
+              )
+            )}
           </h2>
           <p className="text-lg text-muted-foreground">
-            Everything you need to manage your money, all in one powerful platform. 
-            From everyday banking to international business, we've got you covered.
+            {t('services.subtitle')}
           </p>
         </div>
 
@@ -68,8 +77,8 @@ const Services = () => {
         </div>
 
         <div className="text-center">
-          <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold shadow-gold">
-            Explore All Features
+          <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold shadow-gold" asChild>
+            <Link to="/signup">{t('services.cta')}</Link>
           </Button>
         </div>
       </div>
