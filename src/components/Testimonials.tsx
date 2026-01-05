@@ -10,28 +10,28 @@ const Testimonials = () => {
       role: t('testimonials.role1'),
       content: t('testimonials.content1'),
       rating: 5,
-      avatar: "SM",
+      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "David Chen",
       role: t('testimonials.role2'),
       content: t('testimonials.content2'),
       rating: 5,
-      avatar: "DC",
+      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Emma Rodriguez",
       role: t('testimonials.role3'),
       content: t('testimonials.content3'),
       rating: 5,
-      avatar: "ER",
+      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "James Wilson",
       role: t('testimonials.role4'),
       content: t('testimonials.content4'),
       rating: 5,
-      avatar: "JW",
+      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
     },
   ];
 
@@ -71,9 +71,11 @@ const Testimonials = () => {
               </p>
               
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-accent to-accent/50 rounded-full flex items-center justify-center">
-                  <span className="font-bold text-accent-foreground">{testimonial.avatar}</span>
-                </div>
+                <img 
+                  src={testimonial.image} 
+                  alt={testimonial.name}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-accent/30"
+                />
                 <div>
                   <p className="font-bold text-foreground">{testimonial.name}</p>
                   <p className="text-sm text-muted-foreground">{testimonial.role}</p>
