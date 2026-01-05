@@ -8,8 +8,6 @@ import Statistics from "@/components/Statistics";
 import Testimonials from "@/components/Testimonials";
 import Footer from "@/components/Footer";
 import Preloader from "@/components/Preloader";
-import ChatWidget from "@/components/ChatWidget";
-import { LanguageProvider } from "@/contexts/LanguageContext";
 
 const Index = () => {
   return (
@@ -24,7 +22,6 @@ const Index = () => {
       <Statistics />
       <Testimonials />
       <Footer />
-      <ChatWidget />
     </div>
   );
 };

@@ -16,6 +16,7 @@ import About from "./pages/About";
 import Support from "./pages/Support";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
+import ChatWidget from "./components/ChatWidget";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
                 } />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              <ChatWidget />
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>
