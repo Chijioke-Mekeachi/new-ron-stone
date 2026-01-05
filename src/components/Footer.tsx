@@ -36,9 +36,9 @@ const Footer = () => {
   return (
     <footer className="bg-primary text-primary-foreground pt-20 pb-10" id="support">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-12 mb-16">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 lg:gap-12 mb-16">
           {/* Brand */}
-          <div className="lg:col-span-2">
+          <div className="col-span-2 lg:col-span-2">
             <Link to="/" className="flex items-center space-x-2 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-accent to-gold-light rounded-lg flex items-center justify-center">
                 <span className="text-primary font-bold text-xl">RS</span>
@@ -138,7 +138,7 @@ const Footer = () => {
 
         {/* Contact Info */}
         <div className="border-t border-primary-foreground/10 pt-10 pb-8">
-          <div className="grid md:grid-cols-3 gap-8 mb-10">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-10">
             <div className="flex items-start space-x-3">
               <Mail className="w-5 h-5 text-accent mt-1" />
               <div>

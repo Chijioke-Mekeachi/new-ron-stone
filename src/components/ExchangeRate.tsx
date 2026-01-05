@@ -35,10 +35,10 @@ const ExchangeRate = () => {
             </p>
           </div>
 
-          <div className="bg-card/10 backdrop-blur-lg rounded-3xl p-8 border border-primary-foreground/10">
-            <div className="grid lg:grid-cols-2 gap-8">
+          <div className="bg-card/10 backdrop-blur-lg rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-primary-foreground/10">
+            <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
               {/* Currency List */}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {currencies.map((currency) => (
                   <div
                     key={currency.code}

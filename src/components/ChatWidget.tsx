@@ -25,7 +25,7 @@ const ChatWidget = () => {
     <>
       {/* Chat Box */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-[350px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-elegant z-50 animate-scale-in">
+        <div className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 w-[calc(100vw-2rem)] sm:w-[350px] max-w-[350px] bg-card border border-border rounded-2xl shadow-elegant z-50 animate-scale-in">
           {/* Header */}
           <div className="bg-gradient-to-r from-primary to-navy-light text-primary-foreground p-4 rounded-t-2xl flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -80,7 +80,7 @@ const ChatWidget = () => {
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-accent to-gold-light text-accent-foreground rounded-full shadow-gold flex items-center justify-center z-50 hover:scale-110 transition-transform duration-200"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-accent to-gold-light text-accent-foreground rounded-full shadow-gold flex items-center justify-center z-50 hover:scale-110 transition-transform duration-200"
       >
         {isOpen ? (
           <X className="w-6 h-6" />
