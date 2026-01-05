@@ -12,6 +12,7 @@ export const languages = {
 export const translations: Record<Language, Record<string, string>> = {
   en: {
     // Navbar
+    'nav.home': 'Home',
     'nav.personal': 'Personal',
     'nav.business': 'Business',
     'nav.features': 'Features',
@@ -220,6 +221,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   fr: {
     // Navbar
+    'nav.home': 'Accueil',
     'nav.personal': 'Personnel',
     'nav.business': 'Entreprise',
     'nav.features': 'Fonctionnalités',
@@ -387,6 +389,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   es: {
     // Navbar
+    'nav.home': 'Inicio',
     'nav.personal': 'Personal',
     'nav.business': 'Empresas',
     'nav.features': 'Características',
@@ -554,6 +557,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   de: {
     // Navbar
+    'nav.home': 'Startseite',
     'nav.personal': 'Privat',
     'nav.business': 'Geschäft',
     'nav.features': 'Funktionen',
@@ -721,6 +725,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   zh: {
     // Navbar
+    'nav.home': '首页',
     'nav.personal': '个人',
     'nav.business': '企业',
     'nav.features': '功能',
@@ -888,6 +893,7 @@ export const translations: Record<Language, Record<string, string>> = {
   },
   ar: {
     // Navbar
+    'nav.home': 'الرئيسية',
     'nav.personal': 'شخصي',
     'nav.business': 'أعمال',
     'nav.features': 'المميزات',

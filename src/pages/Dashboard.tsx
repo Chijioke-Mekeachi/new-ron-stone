@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Home,
   CreditCard,
@@ -21,25 +22,36 @@ import {
   Eye,
   EyeOff,
   Wallet,
-  Settings,
   Moon,
   Sun
 } from "lucide-react";
-import { demoTransactions, addTransaction, formatCurrency, type Transaction } from "@/lib/demoData";
+import { demoTransactions, formatCurrency, type Transaction } from "@/lib/demoData";
 import { toast } from "@/hooks/use-toast";
+import SuccessModal from "@/components/SuccessModal";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
 const Dashboard = () => {
   const { user, logout, updateUser } = useAuth();
   const { t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<DashboardSection>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>(demoTransactions);
   const [balance, setBalance] = useState(user?.balance || 25000);
-  const [darkMode, setDarkMode] = useState(false);
+  
+  // Loading and modal states
+  const [isTransferLoading, setIsTransferLoading] = useState(false);
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [successModal, setSuccessModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    amount?: string;
+  }>({ isOpen: false, title: '', message: '' });
 
   // Transfer form state
   const [transferForm, setTransferForm] = useState({
@@ -73,13 +85,18 @@ const Dashboard = () => {
     navigate('/');
   };
 
-  const handleTransfer = (e: React.FormEvent) => {
+  const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(transferForm.amount);
     if (amount > balance) {
       toast({ title: "Insufficient funds", variant: "destructive" });
       return;
     }
+
+    setIsTransferLoading(true);
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     const newTransaction: Transaction = {
       id: `TXN${Date.now()}`,
@@ -96,21 +113,30 @@ const Dashboard = () => {
     setBalance(prev => prev - amount);
     updateUser({ balance: balance - amount });
     
-    toast({ 
-      title: "Transfer Successful!", 
-      description: `${formatCurrency(amount, transferForm.currency)} sent to ${transferForm.recipientName}` 
+    setIsTransferLoading(false);
+    
+    setSuccessModal({
+      isOpen: true,
+      title: "Transfer Successful!",
+      message: `Money has been sent to ${transferForm.recipientName}`,
+      amount: formatCurrency(amount, transferForm.currency)
     });
     
     setTransferForm({ recipientName: '', recipientAccount: '', amount: '', currency: 'USD', narrative: '' });
   };
 
-  const handleWithdraw = (e: React.FormEvent) => {
+  const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(withdrawForm.amount);
     if (amount > balance) {
       toast({ title: "Insufficient funds", variant: "destructive" });
       return;
     }
+
+    setIsWithdrawLoading(true);
+
+    // Simulate processing delay
+    await new Promise(resolve => setTimeout(resolve, 2500));
 
     const newTransaction: Transaction = {
       id: `TXN${Date.now()}`,
@@ -126,9 +152,13 @@ const Dashboard = () => {
     setBalance(prev => prev - amount);
     updateUser({ balance: balance - amount });
     
-    toast({ 
-      title: "Withdrawal Processing", 
-      description: `${formatCurrency(amount, 'USD')} will be sent to your ${withdrawForm.destination}` 
+    setIsWithdrawLoading(false);
+    
+    setSuccessModal({
+      isOpen: true,
+      title: "Withdrawal Processing!",
+      message: `Your withdrawal is being processed and will be sent to your ${withdrawForm.destination}`,
+      amount: formatCurrency(amount, 'USD')
     });
     
     setWithdrawForm({ amount: '', destination: 'bank' });
@@ -360,9 +390,19 @@ const Dashboard = () => {
                     placeholder="Payment for..."
                   />
                 </div>
-                <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                  <Send className="w-4 h-4 mr-2" />
-                  {t('dashboard.sendMoney')}
+                <Button 
+                  type="submit" 
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+                  disabled={isTransferLoading}
+                >
+                  {isTransferLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      {t('dashboard.sendMoney')}
+                    </>
+                  )}
                 </Button>
               </form>
             </div>
@@ -397,9 +437,19 @@ const Dashboard = () => {
                     <option value="card">{t('dashboard.card')}</option>
                   </select>
                 </div>
-                <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                  <ArrowDownToLine className="w-4 h-4 mr-2" />
-                  {t('dashboard.processWithdraw')}
+                <Button 
+                  type="submit" 
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+                  disabled={isWithdrawLoading}
+                >
+                  {isWithdrawLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <>
+                      <ArrowDownToLine className="w-4 h-4 mr-2" />
+                      {t('dashboard.processWithdraw')}
+                    </>
+                  )}
                 </Button>
               </form>
             </div>
@@ -526,14 +576,14 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between py-3 border-b border-border">
                   <div className="flex items-center space-x-3">
-                    {darkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                    {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                     <span>{t('dashboard.darkMode')}</span>
                   </div>
                   <button 
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={`w-12 h-6 rounded-full transition-colors ${darkMode ? 'bg-accent' : 'bg-secondary'}`}
+                    onClick={toggleTheme}
+                    className={`w-12 h-6 rounded-full transition-colors ${theme === 'dark' ? 'bg-accent' : 'bg-secondary'}`}
                   >
-                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <div className={`w-5 h-5 bg-foreground rounded-full transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>
@@ -690,6 +740,15 @@ const Dashboard = () => {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal({ ...successModal, isOpen: false })}
+        title={successModal.title}
+        message={successModal.message}
+        amount={successModal.amount}
+      />
     </div>
   );
 };
