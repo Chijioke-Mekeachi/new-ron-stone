@@ -23,12 +23,16 @@ import {
   EyeOff,
   Wallet,
   Moon,
-  Sun
+  Sun,
+  Download
 } from "lucide-react";
 import { demoTransactions, formatCurrency, type Transaction } from "@/lib/demoData";
 import { toast } from "@/hooks/use-toast";
 import SuccessModal from "@/components/SuccessModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import TransactionExport from "@/components/dashboard/TransactionExport";
+import PushNotifications from "@/components/dashboard/PushNotifications";
+import TransferForm from "@/components/dashboard/TransferForm";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
@@ -288,125 +292,89 @@ const Dashboard = () => {
 
       case 'transactions':
         return (
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <h3 className="font-bold text-xl mb-6">{t('dashboard.transactions')}</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.date')}</th>
-                    <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.description')}</th>
-                    <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.type')}</th>
-                    <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.amount')}</th>
-                    <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.status')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b border-border last:border-0">
-                      <td className="py-4">{tx.date}</td>
-                      <td className="py-4">{tx.description}</td>
-                      <td className="py-4">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          tx.type === 'credit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                        }`}>
-                          {tx.type === 'credit' ? t('dashboard.credit') : t('dashboard.debit')}
-                        </span>
-                      </td>
-                      <td className={`py-4 font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
-                        {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-                      </td>
-                      <td className="py-4">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                          tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                          'bg-red-500/10 text-red-500'
-                        }`}>
-                          {tx.status}
-                        </span>
-                      </td>
+          <div className="space-y-6">
+            {/* Export Section */}
+            <TransactionExport 
+              transactions={transactions}
+              userName={`${user?.firstName} ${user?.lastName}`}
+              accountNumber={user?.accountNumber || ''}
+            />
+            
+            {/* Transactions Table */}
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <h3 className="font-bold text-xl mb-6">{t('dashboard.transactions')}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.date')}</th>
+                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.description')}</th>
+                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.type')}</th>
+                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.amount')}</th>
+                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.status')}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="border-b border-border last:border-0">
+                        <td className="py-4">{tx.date}</td>
+                        <td className="py-4">{tx.description}</td>
+                        <td className="py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            tx.type === 'credit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                          }`}>
+                            {tx.type === 'credit' ? t('dashboard.credit') : t('dashboard.debit')}
+                          </span>
+                        </td>
+                        <td className={`py-4 font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
+                          {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                        </td>
+                        <td className="py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                            tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
+                            'bg-red-500/10 text-red-500'
+                          }`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         );
 
       case 'transfer':
         return (
-          <div className="max-w-xl mx-auto">
-            <div className="bg-card rounded-2xl border border-border p-8">
-              <h3 className="font-bold text-xl mb-6">{t('dashboard.transfer')}</h3>
-              <form onSubmit={handleTransfer} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">{t('dashboard.recipientName')}</label>
-                  <Input 
-                    value={transferForm.recipientName}
-                    onChange={(e) => setTransferForm({...transferForm, recipientName: e.target.value})}
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">{t('dashboard.recipientAccount')}</label>
-                  <Input 
-                    value={transferForm.recipientAccount}
-                    onChange={(e) => setTransferForm({...transferForm, recipientAccount: e.target.value})}
-                    placeholder="Enter account number"
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">{t('dashboard.amount')}</label>
-                    <Input 
-                      type="number"
-                      value={transferForm.amount}
-                      onChange={(e) => setTransferForm({...transferForm, amount: e.target.value})}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">{t('dashboard.currency')}</label>
-                    <select 
-                      value={transferForm.currency}
-                      onChange={(e) => setTransferForm({...transferForm, currency: e.target.value})}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                    >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="NGN">NGN</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">{t('dashboard.narrative')}</label>
-                  <Input 
-                    value={transferForm.narrative}
-                    onChange={(e) => setTransferForm({...transferForm, narrative: e.target.value})}
-                    placeholder="Payment for..."
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
-                  disabled={isTransferLoading}
-                >
-                  {isTransferLoading ? (
-                    <LoadingSpinner size="sm" />
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      {t('dashboard.sendMoney')}
-                    </>
-                  )}
-                </Button>
-              </form>
-            </div>
-          </div>
+          <TransferForm 
+            balance={balance}
+            onTransferComplete={(transfer) => {
+              const newTransaction: Transaction = {
+                id: `TXN${Date.now()}`,
+                date: new Date().toISOString().split('T')[0],
+                type: 'debit',
+                amount: transfer.amount,
+                currency: 'USD',
+                status: 'pending',
+                description: `Transfer to ${transfer.recipientName}`,
+                recipient: transfer.recipientName
+              };
+              
+              setTransactions([newTransaction, ...transactions]);
+              setBalance(prev => prev - transfer.amount);
+              updateUser({ balance: balance - transfer.amount });
+              
+              setSuccessModal({
+                isOpen: true,
+                title: "Transfer Initiated!",
+                message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
+                amount: formatCurrency(transfer.amount, 'USD')
+              });
+            }}
+          />
         );
 
       case 'withdraw':
@@ -593,23 +561,29 @@ const Dashboard = () => {
 
       case 'notifications':
         return (
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <h3 className="font-bold text-xl mb-6">{t('dashboard.notifications')}</h3>
-            <div className="space-y-4">
-              {notifications.map((notif) => (
-                <div 
-                  key={notif.id} 
-                  className={`p-4 rounded-xl border ${notif.read ? 'border-border bg-secondary/30' : 'border-accent/30 bg-accent/5'}`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{notif.title}</p>
-                      <p className="text-muted-foreground text-sm mt-1">{notif.message}</p>
+          <div className="space-y-6">
+            {/* Push Notification Settings */}
+            <PushNotifications />
+            
+            {/* Recent Notifications */}
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <h3 className="font-bold text-xl mb-6">{t('dashboard.notifications')}</h3>
+              <div className="space-y-4">
+                {notifications.map((notif) => (
+                  <div 
+                    key={notif.id} 
+                    className={`p-4 rounded-xl border ${notif.read ? 'border-border bg-secondary/30' : 'border-accent/30 bg-accent/5'}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{notif.title}</p>
+                        <p className="text-muted-foreground text-sm mt-1">{notif.message}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{notif.time}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{notif.time}</span>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         );
