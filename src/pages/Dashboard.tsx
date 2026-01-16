@@ -33,6 +33,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import TransactionExport from "@/components/dashboard/TransactionExport";
 import PushNotifications from "@/components/dashboard/PushNotifications";
 import TransferForm from "@/components/dashboard/TransferForm";
+import TransactionPinSetup from "@/components/dashboard/TransactionPinSetup";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
@@ -538,6 +539,9 @@ const Dashboard = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Transaction PIN Setup */}
+            <TransactionPinSetup />
 
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">{t('dashboard.preferences')}</h3>
