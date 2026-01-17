@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/demoData";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import PinVerificationModal from "./PinVerificationModal";
 
 interface TransferFormProps {
   balance: number;
@@ -27,7 +28,7 @@ interface TransferFormProps {
 }
 
 type VerificationStatus = 'idle' | 'verifying' | 'verified' | 'warning' | 'error';
-type TransferStep = 'form' | 'confirmation' | 'processing' | 'complete';
+type TransferStep = 'form' | 'confirmation' | 'pin_verification' | 'processing' | 'complete';
 
 const US_BANKS = [
   { name: 'Chase Bank', routingPrefix: '021' },
@@ -46,6 +47,7 @@ const TransferForm = ({ balance, onTransferComplete }: TransferFormProps) => {
   const [step, setStep] = useState<TransferStep>('form');
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('idle');
   const [maskedName, setMaskedName] = useState('');
+  const [showPinModal, setShowPinModal] = useState(false);
   
   const [form, setForm] = useState({
     bankName: '',
@@ -121,12 +123,18 @@ const TransferForm = ({ balance, onTransferComplete }: TransferFormProps) => {
     }
   };
 
-  const handleConfirmTransfer = async () => {
+  const handleConfirmTransfer = () => {
     if (!form.authorized) {
       setErrors({ authorized: 'Please authorize this transfer' });
       return;
     }
 
+    // Show PIN verification modal
+    setShowPinModal(true);
+  };
+
+  const handlePinVerified = async () => {
+    setShowPinModal(false);
     setStep('processing');
 
     // Simulate transfer processing
@@ -526,6 +534,15 @@ const TransferForm = ({ balance, onTransferComplete }: TransferFormProps) => {
           </div>
         </form>
       </div>
+
+      {/* PIN Verification Modal */}
+      <PinVerificationModal
+        isOpen={showPinModal}
+        onClose={() => setShowPinModal(false)}
+        onVerified={handlePinVerified}
+        title="Verify Transfer"
+        description="Enter your PIN to authorize this transfer"
+      />
     </div>
   );
 };

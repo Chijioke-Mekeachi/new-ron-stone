@@ -24,7 +24,8 @@ import {
   Wallet,
   Moon,
   Sun,
-  Download
+  Download,
+  Shield
 } from "lucide-react";
 import { demoTransactions, formatCurrency, type Transaction } from "@/lib/demoData";
 import { toast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ import TransactionExport from "@/components/dashboard/TransactionExport";
 import PushNotifications from "@/components/dashboard/PushNotifications";
 import TransferForm from "@/components/dashboard/TransferForm";
 import TransactionPinSetup from "@/components/dashboard/TransactionPinSetup";
+import PinVerificationModal from "@/components/dashboard/PinVerificationModal";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
@@ -72,6 +74,10 @@ const Dashboard = () => {
     amount: '',
     destination: 'bank'
   });
+
+  // PIN verification for withdraw
+  const [showWithdrawPinModal, setShowWithdrawPinModal] = useState(false);
+  const [pendingWithdraw, setPendingWithdraw] = useState(false);
 
   const menuItems = [
     { id: 'overview', label: t('dashboard.overview'), icon: Home },
@@ -137,7 +143,19 @@ const Dashboard = () => {
       toast({ title: "Insufficient funds", variant: "destructive" });
       return;
     }
+    if (amount <= 0) {
+      toast({ title: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
 
+    // Show PIN verification modal
+    setShowWithdrawPinModal(true);
+  };
+
+  const handleWithdrawPinVerified = async () => {
+    setShowWithdrawPinModal(false);
+    const amount = parseFloat(withdrawForm.amount);
+    
     setIsWithdrawLoading(true);
 
     // Simulate processing delay
@@ -513,6 +531,7 @@ const Dashboard = () => {
       case 'profile':
         return (
           <div className="max-w-2xl mx-auto space-y-6">
+            {/* Personal Information */}
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">{t('dashboard.personal')}</h3>
               <div className="space-y-4">
@@ -534,8 +553,134 @@ const Dashboard = () => {
                   <label className="block text-sm font-medium mb-2">{t('dashboard.phone')}</label>
                   <Input placeholder="+1 (555) 000-0000" />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Date of Birth</label>
+                  <Input type="date" placeholder="MM/DD/YYYY" />
+                </div>
                 <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   {t('dashboard.updateProfile')}
+                </Button>
+              </div>
+            </div>
+
+            {/* Address Information */}
+            <div className="bg-card rounded-2xl border border-border p-8">
+              <h3 className="font-bold text-xl mb-6">Address Information</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Street Address</label>
+                  <Input placeholder="123 Main Street" />
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">City</label>
+                    <Input placeholder="New York" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">State/Province</label>
+                    <Input placeholder="NY" />
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">ZIP/Postal Code</label>
+                    <Input placeholder="10001" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Country</label>
+                    <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                      <option value="US">United States</option>
+                      <option value="CA">Canada</option>
+                      <option value="UK">United Kingdom</option>
+                      <option value="AU">Australia</option>
+                      <option value="DE">Germany</option>
+                      <option value="FR">France</option>
+                    </select>
+                  </div>
+                </div>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  Update Address
+                </Button>
+              </div>
+            </div>
+
+            {/* Employment Information */}
+            <div className="bg-card rounded-2xl border border-border p-8">
+              <h3 className="font-bold text-xl mb-6">Employment Information</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Occupation</label>
+                  <Input placeholder="Software Engineer" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Employer Name</label>
+                  <Input placeholder="Company Name" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Annual Income Range</label>
+                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                    <option value="">Select income range</option>
+                    <option value="0-25000">$0 - $25,000</option>
+                    <option value="25000-50000">$25,000 - $50,000</option>
+                    <option value="50000-75000">$50,000 - $75,000</option>
+                    <option value="75000-100000">$75,000 - $100,000</option>
+                    <option value="100000-150000">$100,000 - $150,000</option>
+                    <option value="150000+">$150,000+</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Source of Funds</label>
+                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                    <option value="">Select source</option>
+                    <option value="salary">Salary/Employment</option>
+                    <option value="business">Business Income</option>
+                    <option value="investments">Investments</option>
+                    <option value="inheritance">Inheritance</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  Update Employment Info
+                </Button>
+              </div>
+            </div>
+
+            {/* Identification */}
+            <div className="bg-card rounded-2xl border border-border p-8">
+              <h3 className="font-bold text-xl mb-6">Identification Documents</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">ID Type</label>
+                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                    <option value="">Select ID type</option>
+                    <option value="passport">Passport</option>
+                    <option value="drivers_license">Driver's License</option>
+                    <option value="national_id">National ID</option>
+                    <option value="ssn">Social Security Number</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">ID Number</label>
+                  <Input type="password" placeholder="••••••••••" />
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Issue Date</label>
+                    <Input type="date" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                    <Input type="date" />
+                  </div>
+                </div>
+                <div className="p-4 bg-secondary/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    <Shield className="w-4 h-4 inline mr-2" />
+                    Your identification documents are encrypted and stored securely. We only use this information for verification purposes.
+                  </p>
+                </div>
+                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  Update ID Information
                 </Button>
               </div>
             </div>
@@ -543,6 +688,7 @@ const Dashboard = () => {
             {/* Transaction PIN Setup */}
             <TransactionPinSetup />
 
+            {/* Preferences */}
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">{t('dashboard.preferences')}</h3>
               <div className="space-y-4">
@@ -556,6 +702,24 @@ const Dashboard = () => {
                     className={`w-12 h-6 rounded-full transition-colors ${theme === 'dark' ? 'bg-accent' : 'bg-secondary'}`}
                   >
                     <div className={`w-5 h-5 bg-foreground rounded-full transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="flex items-center space-x-3">
+                    <Bell className="w-5 h-5" />
+                    <span>Email Notifications</span>
+                  </div>
+                  <button className="w-12 h-6 rounded-full transition-colors bg-accent">
+                    <div className="w-5 h-5 bg-foreground rounded-full translate-x-6 transition-transform" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center space-x-3">
+                    <Send className="w-5 h-5" />
+                    <span>SMS Alerts</span>
+                  </div>
+                  <button className="w-12 h-6 rounded-full transition-colors bg-accent">
+                    <div className="w-5 h-5 bg-foreground rounded-full translate-x-6 transition-transform" />
                   </button>
                 </div>
               </div>
@@ -726,6 +890,15 @@ const Dashboard = () => {
         title={successModal.title}
         message={successModal.message}
         amount={successModal.amount}
+      />
+
+      {/* Withdraw PIN Verification Modal */}
+      <PinVerificationModal
+        isOpen={showWithdrawPinModal}
+        onClose={() => setShowWithdrawPinModal(false)}
+        onVerified={handleWithdrawPinVerified}
+        title="Verify Withdrawal"
+        description="Enter your PIN to authorize this withdrawal"
       />
     </div>
   );
