@@ -72,12 +72,30 @@ const Dashboard = () => {
   // Withdraw form state
   const [withdrawForm, setWithdrawForm] = useState({
     amount: '',
-    destination: 'bank'
+    destination: 'bank',
+    // Bank details
+    bankName: '',
+    accountNumber: '',
+    routingNumber: '',
+    accountHolderName: '',
+    // Card details
+    cardNumber: '',
+    cardHolderName: '',
+    expiryDate: '',
+    cvv: ''
   });
 
   // PIN verification for withdraw
   const [showWithdrawPinModal, setShowWithdrawPinModal] = useState(false);
   const [pendingWithdraw, setPendingWithdraw] = useState(false);
+
+  // Cards state
+  const [userCards, setUserCards] = useState([
+    { id: 1, type: 'Virtual', number: '**** **** **** 4532', expires: '12/26', status: 'active' as 'active' | 'frozen' },
+    { id: 2, type: 'Physical', number: '**** **** **** 8891', expires: '08/27', status: 'active' as 'active' | 'frozen' },
+  ]);
+  const [showNewCardModal, setShowNewCardModal] = useState(false);
+  const [newCardType, setNewCardType] = useState<'Virtual' | 'Physical'>('Virtual');
 
   const menuItems = [
     { id: 'overview', label: t('dashboard.overview'), icon: Home },
@@ -180,11 +198,52 @@ const Dashboard = () => {
     setSuccessModal({
       isOpen: true,
       title: "Withdrawal Processing!",
-      message: `Your withdrawal is being processed and will be sent to your ${withdrawForm.destination}`,
+      message: `Your withdrawal is being processed and will be sent to your ${withdrawForm.destination === 'bank' ? 'bank account' : 'card'}`,
       amount: formatCurrency(amount, 'USD')
     });
     
-    setWithdrawForm({ amount: '', destination: 'bank' });
+    setWithdrawForm({ 
+      amount: '', 
+      destination: 'bank',
+      bankName: '',
+      accountNumber: '',
+      routingNumber: '',
+      accountHolderName: '',
+      cardNumber: '',
+      cardHolderName: '',
+      expiryDate: '',
+      cvv: ''
+    });
+  };
+
+  const toggleCardStatus = (cardId: number) => {
+    setUserCards(prev => prev.map(card => {
+      if (card.id === cardId) {
+        const newStatus = card.status === 'active' ? 'frozen' : 'active';
+        toast({
+          title: newStatus === 'frozen' ? "Card Frozen" : "Card Unfrozen",
+          description: `Your ${card.type} card has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`
+        });
+        return { ...card, status: newStatus };
+      }
+      return card;
+    }));
+  };
+
+  const requestNewCard = () => {
+    const newCard = {
+      id: Date.now(),
+      type: newCardType,
+      number: `**** **** **** ${Math.floor(1000 + Math.random() * 9000)}`,
+      expires: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getFullYear() + 3).slice(-2)}`,
+      status: 'active' as const
+    };
+    setUserCards(prev => [...prev, newCard]);
+    setShowNewCardModal(false);
+    toast({
+      title: "Card Requested",
+      description: `Your new ${newCardType} card has been requested and will be ready shortly.`
+    });
   };
 
   const cards = [
@@ -420,10 +479,102 @@ const Dashboard = () => {
                     className="w-full h-10 px-3 rounded-md border border-input bg-background"
                   >
                     <option value="bank">{t('dashboard.bankAccount')}</option>
-                    <option value="wallet">{t('dashboard.wallet')}</option>
                     <option value="card">{t('dashboard.card')}</option>
                   </select>
                 </div>
+
+                {/* Bank Details Form */}
+                {withdrawForm.destination === 'bank' && (
+                  <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
+                    <h4 className="font-medium text-sm text-muted-foreground">Bank Account Details</h4>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Bank Name</label>
+                      <Input 
+                        value={withdrawForm.bankName}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
+                        placeholder="Enter bank name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Account Holder Name</label>
+                      <Input 
+                        value={withdrawForm.accountHolderName}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, accountHolderName: e.target.value})}
+                        placeholder="Enter account holder name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Account Number</label>
+                      <Input 
+                        value={withdrawForm.accountNumber}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
+                        placeholder="Enter account number"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Routing Number</label>
+                      <Input 
+                        value={withdrawForm.routingNumber}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, routingNumber: e.target.value})}
+                        placeholder="Enter routing number"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Details Form */}
+                {withdrawForm.destination === 'card' && (
+                  <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
+                    <h4 className="font-medium text-sm text-muted-foreground">Card Details</h4>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Cardholder Name</label>
+                      <Input 
+                        value={withdrawForm.cardHolderName}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, cardHolderName: e.target.value})}
+                        placeholder="Enter name on card"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Card Number</label>
+                      <Input 
+                        value={withdrawForm.cardNumber}
+                        onChange={(e) => setWithdrawForm({...withdrawForm, cardNumber: e.target.value})}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength={19}
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                        <Input 
+                          value={withdrawForm.expiryDate}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, expiryDate: e.target.value})}
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">CVV</label>
+                        <Input 
+                          type="password"
+                          value={withdrawForm.cvv}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, cvv: e.target.value})}
+                          placeholder="***"
+                          maxLength={4}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Button 
                   type="submit" 
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
@@ -496,20 +647,38 @@ const Dashboard = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-xl">{t('dashboard.cards')}</h3>
-              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                {t('dashboard.addCard')}
+              <Button 
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                onClick={() => setShowNewCardModal(true)}
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Request New Card
               </Button>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              {cards.map((card) => (
-                <div key={card.id} className="relative bg-gradient-to-br from-primary to-navy-light p-6 rounded-2xl text-primary-foreground overflow-hidden">
+              {userCards.map((card) => (
+                <div 
+                  key={card.id} 
+                  className={`relative p-6 rounded-2xl text-primary-foreground overflow-hidden transition-all ${
+                    card.status === 'frozen' 
+                      ? 'bg-gradient-to-br from-gray-500 to-gray-700 opacity-75' 
+                      : 'bg-gradient-to-br from-primary to-navy-light'
+                  }`}
+                >
                   <div className="absolute top-4 right-4">
                     <CreditCard className="w-8 h-8 opacity-50" />
                   </div>
-                  <p className="text-sm text-primary-foreground/70">{card.type} Card</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-primary-foreground/70">{card.type} Card</p>
+                    {card.status === 'frozen' && (
+                      <span className="text-xs bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full">
+                        Frozen
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xl font-mono mt-4 tracking-wider">{card.number}</p>
-                  <div className="flex justify-between mt-6">
+                  <div className="flex justify-between items-end mt-6">
                     <div>
                       <p className="text-xs text-primary-foreground/70">{t('dashboard.expires')}</p>
                       <p className="font-medium">{card.expires}</p>
@@ -517,14 +686,100 @@ const Dashboard = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                      className={`border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 ${
+                        card.status === 'frozen' ? 'border-blue-300 text-blue-200' : ''
+                      }`}
+                      onClick={() => toggleCardStatus(card.id)}
                     >
-                      {card.status === 'active' ? t('dashboard.freeze') : t('dashboard.unfreeze')}
+                      {card.status === 'active' ? (
+                        <>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {t('dashboard.freeze')}
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {t('dashboard.unfreeze')}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* New Card Request Modal */}
+            {showNewCardModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full">
+                  <h3 className="font-bold text-xl mb-4">Request New Card</h3>
+                  <p className="text-muted-foreground text-sm mb-6">
+                    Choose the type of card you'd like to request. Virtual cards are available instantly, 
+                    while physical cards will be delivered to your registered address.
+                  </p>
+                  
+                  <div className="space-y-3 mb-6">
+                    <button
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                        newCardType === 'Virtual' 
+                          ? 'border-accent bg-accent/10' 
+                          : 'border-border hover:border-accent/50'
+                      }`}
+                      onClick={() => setNewCardType('Virtual')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          newCardType === 'Virtual' ? 'bg-accent text-accent-foreground' : 'bg-secondary'
+                        }`}>
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Virtual Card</p>
+                          <p className="text-sm text-muted-foreground">Instant access for online purchases</p>
+                        </div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                        newCardType === 'Physical' 
+                          ? 'border-accent bg-accent/10' 
+                          : 'border-border hover:border-accent/50'
+                      }`}
+                      onClick={() => setNewCardType('Physical')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          newCardType === 'Physical' ? 'bg-accent text-accent-foreground' : 'bg-secondary'
+                        }`}>
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Physical Card</p>
+                          <p className="text-sm text-muted-foreground">Delivered to your address in 5-7 days</p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setShowNewCardModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="flex-1 bg-accent hover:bg-accent/90 text-accent-foreground"
+                      onClick={requestNewCard}
+                    >
+                      Request Card
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
