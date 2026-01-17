@@ -17,18 +17,18 @@ const Preloader = () => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background">
       <div className="text-center">
-        {/* Logo */}
+        {/* Circular Spinner */}
         <div className="mb-8 flex justify-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-accent to-gold-light rounded-2xl flex items-center justify-center shadow-gold animate-pulse">
-            <span className="text-primary font-bold text-3xl">RS</span>
+          <div className="relative w-24 h-24">
+            {/* Outer spinning ring */}
+            <div className="absolute inset-0 rounded-full border-4 border-accent/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-accent animate-spin"></div>
+            
+            {/* Inner logo */}
+            <div className="absolute inset-3 bg-gradient-to-br from-accent to-gold-light rounded-full flex items-center justify-center shadow-gold">
+              <span className="text-primary font-bold text-2xl">RS</span>
+            </div>
           </div>
-        </div>
-        
-        {/* Loading animation */}
-        <div className="flex space-x-2 justify-center">
-          <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
         
         <p className="mt-4 text-muted-foreground font-medium">Loading your banking experience...</p>

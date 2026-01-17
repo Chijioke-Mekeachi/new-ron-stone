@@ -6,6 +6,7 @@ import ExchangeRate from "@/components/ExchangeRate";
 import Features from "@/components/Features";
 import Statistics from "@/components/Statistics";
 import Testimonials from "@/components/Testimonials";
+import AppStoreSection from "@/components/AppStoreSection";
 import Footer from "@/components/Footer";
 import Preloader from "@/components/Preloader";
 
@@ -21,6 +22,7 @@ const Index = () => {
       <Features />
       <Statistics />
       <Testimonials />
+      <AppStoreSection />
       <Footer />
     </div>
   );
