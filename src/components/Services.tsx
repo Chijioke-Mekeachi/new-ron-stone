@@ -63,10 +63,10 @@ const Services = () => {
             return (
               <div
                 key={index}
-                className="p-8 bg-card rounded-2xl border border-border hover:border-accent/30 transition-all duration-300 hover:shadow-elegant group animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="p-8 bg-card rounded-2xl border border-border hover:border-accent/30 transition-all duration-300 hover-glow group animate-fade-up opacity-0"
+                style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'forwards' }}
               >
-                <div className="w-16 h-16 bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <div className="w-16 h-16 bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                   <Icon className="w-8 h-8 text-accent" />
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-foreground">{service.title}</h3>
