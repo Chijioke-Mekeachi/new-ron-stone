@@ -36,14 +36,14 @@ const Hero = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold shadow-gold group" asChild>
+              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold shadow-gold group animate-pulse-glow" asChild>
                 <Link to="/signup">
                   {t('hero.cta.primary')}
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" className="border-primary/20 hover:bg-primary/5" asChild>
-                <Link to="/login">{t('hero.cta.secondary')}</Link>
+              <Button size="lg" variant="outline" className="border-primary/20 hover:bg-primary/5 hover-lift" asChild>
+                <Link to="/about">{t('hero.cta.secondary')}</Link>
               </Button>
             </div>
 
@@ -66,7 +66,7 @@ const Hero = () => {
 
           {/* Right Content - Mockup */}
           <div className="relative animate-fade-in">
-            <div className="relative z-10">
+            <div className="relative z-10 animate-float">
               <img
                 src={heroMockup}
                 alt="Ron Stone Bank Mobile App"
@@ -74,8 +74,8 @@ const Hero = () => {
               />
             </div>
             {/* Decorative elements */}
-            <div className="absolute -top-10 -right-10 w-72 h-72 bg-accent/20 rounded-full blur-3xl" />
-            <div className="absolute -bottom-10 -left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
+            <div className="absolute -top-10 -right-10 w-72 h-72 bg-accent/20 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute -bottom-10 -left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
           </div>
         </div>
       </div>

@@ -51,10 +51,10 @@ const WhyChoose = () => {
             return (
               <div
                 key={index}
-                className="group p-8 bg-card rounded-2xl border border-border hover:border-accent/50 transition-all duration-300 hover:shadow-gold hover:-translate-y-2 animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="group p-8 bg-card rounded-2xl border border-border hover:border-accent/50 transition-all duration-300 hover-lift hover-glow animate-fade-up opacity-0"
+                style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'forwards' }}
               >
-                <div className="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent/20 transition-colors">
+                <div className="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                   <Icon className="w-7 h-7 text-accent" />
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-foreground">{feature.title}</h3>

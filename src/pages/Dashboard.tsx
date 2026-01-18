@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import LanguageSelector from "@/components/LanguageSelector";
 import {
   Home,
   CreditCard,
@@ -25,7 +26,8 @@ import {
   Moon,
   Sun,
   Download,
-  Shield
+  Shield,
+  Camera
 } from "lucide-react";
 import { demoTransactions, formatCurrency, type Transaction } from "@/lib/demoData";
 import { toast } from "@/hooks/use-toast";
@@ -96,6 +98,26 @@ const Dashboard = () => {
   ]);
   const [showNewCardModal, setShowNewCardModal] = useState(false);
   const [newCardType, setNewCardType] = useState<'Virtual' | 'Physical'>('Virtual');
+
+  // Profile picture state
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Please select an image under 5MB", variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePicture(reader.result as string);
+        toast({ title: "Profile picture updated!", description: "Your new profile picture has been saved." });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const menuItems = [
     { id: 'overview', label: t('dashboard.overview'), icon: Home },
@@ -785,7 +807,49 @@ const Dashboard = () => {
 
       case 'profile':
         return (
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-2xl mx-auto space-y-6 animate-fade-up">
+            {/* Profile Picture Section */}
+            <div className="bg-card rounded-2xl border border-border p-8">
+              <h3 className="font-bold text-xl mb-6">Profile Picture</h3>
+              <div className="flex items-center space-x-6">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-accent/30 group-hover:border-accent transition-colors duration-300">
+                    {profilePicture ? (
+                      <img 
+                        src={profilePicture} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-accent to-gold-light flex items-center justify-center">
+                        <span className="text-2xl font-bold text-primary">
+                          {user?.firstName[0]}{user?.lastName[0]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                  />
+                </div>
+                <div>
+                  <p className="font-medium text-lg">{user?.firstName} {user?.lastName}</p>
+                  <p className="text-muted-foreground text-sm">Click the camera icon to upload a new photo</p>
+                  <p className="text-muted-foreground text-xs mt-1">Maximum file size: 5MB</p>
+                </div>
+              </div>
+            </div>
+
             {/* Personal Information */}
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">{t('dashboard.personal')}</h3>
@@ -1105,21 +1169,39 @@ const Dashboard = () => {
               </button>
               <h1 className="text-xl font-bold">{t('dashboard.welcome')}, {user.firstName}!</h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <button
+                onClick={toggleTheme}
+                className="p-2 hover:bg-secondary rounded-lg transition-colors"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+              <LanguageSelector />
               <button 
                 onClick={() => setActiveSection('notifications')}
                 className="relative p-2 hover:bg-secondary rounded-lg transition-colors"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold text-accent-foreground">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </span>
-                </div>
-              </div>
+              <button 
+                onClick={() => setActiveSection('profile')}
+                className="flex items-center space-x-2"
+              >
+                {profilePicture ? (
+                  <img 
+                    src={profilePicture} 
+                    alt="Profile" 
+                    className="w-8 h-8 rounded-full object-cover border-2 border-accent/30 hover:border-accent transition-colors"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center hover:scale-105 transition-transform">
+                    <span className="text-sm font-bold text-accent-foreground">
+                      {user.firstName[0]}{user.lastName[0]}
+                    </span>
+                  </div>
+                )}
+              </button>
             </div>
           </div>
         </header>

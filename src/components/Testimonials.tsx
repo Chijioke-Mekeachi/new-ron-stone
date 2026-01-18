@@ -57,12 +57,12 @@ const Testimonials = () => {
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="p-8 bg-card rounded-2xl border border-border hover:border-accent/30 transition-all duration-300 hover:shadow-elegant group animate-fade-up"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="p-8 bg-card rounded-2xl border border-border hover:border-accent/30 transition-all duration-300 hover-glow group animate-fade-up opacity-0"
+              style={{ animationDelay: `${index * 0.15}s`, animationFillMode: 'forwards' }}
             >
               <div className="flex items-center space-x-1 mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-accent text-accent" />
+                  <Star key={i} className="w-5 h-5 fill-accent text-accent transition-transform group-hover:scale-110" style={{ transitionDelay: `${i * 50}ms` }} />
                 ))}
               </div>
               
@@ -74,7 +74,7 @@ const Testimonials = () => {
                 <img 
                   src={testimonial.image} 
                   alt={testimonial.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-accent/30"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-accent/30 group-hover:border-accent transition-colors duration-300"
                 />
                 <div>
                   <p className="font-bold text-foreground">{testimonial.name}</p>

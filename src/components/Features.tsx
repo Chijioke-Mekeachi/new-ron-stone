@@ -65,10 +65,10 @@ const Features = () => {
             return (
               <div
                 key={index}
-                className="p-6 bg-card rounded-xl border border-border hover:border-accent/30 transition-all duration-300 group animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="p-6 bg-card rounded-xl border border-border hover:border-accent/30 transition-all duration-300 group animate-fade-up hover-lift opacity-0"
+                style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'forwards' }}
               >
-                <Icon className="w-10 h-10 text-accent mb-4 group-hover:scale-110 transition-transform" />
+                <Icon className="w-10 h-10 text-accent mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
                 <h3 className="text-lg font-bold mb-2 text-foreground">{feature.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
               </div>
