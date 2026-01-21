@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import LanguageSelector from "@/components/LanguageSelector";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Check, ChevronRight, ChevronLeft, User, Phone, Lock, Shield } from "lucide-react";
 
 const countries = [
@@ -37,6 +38,7 @@ const Signup = () => {
   const [country, setCountry] = useState("US");
   const [transactionPin, setTransactionPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   
   const { signup } = useAuth();
   const { t } = useLanguage();
@@ -107,38 +109,46 @@ const Signup = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateStep4()) return;
 
-    // Store additional user data
-    const userData = {
-      phoneNumber: `${selectedCountry?.dialCode}${phoneNumber}`,
-      country,
-      transactionPin,
-    };
+    setIsLoading(true);
 
-    if (signup(email, password, firstName, lastName)) {
-      // Store PIN separately in localStorage
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const userIndex = users.findIndex((u: any) => u.email === email);
-      if (userIndex !== -1) {
-        users[userIndex] = { ...users[userIndex], ...userData };
-        localStorage.setItem('users', JSON.stringify(users));
+    try {
+      const result = await signup(email, password, firstName, lastName);
+      
+      if (result.success) {
+        // Store additional user data in profiles table
+        // This is handled by the Supabase trigger we created earlier
+        // If you need to update the profile with additional info, you can do it here
+        // For now, the trigger handles basic profile creation
+        
+        toast({
+          title: "Success",
+          description: "Account created successfully! Please check your email to confirm your account.",
+        });
+        
+        // Navigate to login page instead of dashboard
+        // User needs to verify email first (if email confirmation is enabled)
+        navigate("/login");
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to create account",
+          variant: "destructive",
+        });
       }
-
-      toast({
-        title: "Success",
-        description: "Account created successfully!",
-      });
-      navigate("/dashboard");
-    } else {
+    } catch (error: any) {
+      console.error("Signup error:", error);
       toast({
         title: "Error",
-        description: "User already exists",
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -163,6 +173,8 @@ const Signup = () => {
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
                   className="h-12"
+                  disabled={isLoading}
+                  required
                 />
               </div>
               <div>
@@ -175,6 +187,8 @@ const Signup = () => {
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
                   className="h-12"
+                  disabled={isLoading}
+                  required
                 />
               </div>
             </div>
@@ -189,6 +203,8 @@ const Signup = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="john@example.com"
                 className="h-12"
+                disabled={isLoading}
+                required
               />
             </div>
           </div>
@@ -209,7 +225,8 @@ const Signup = () => {
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full h-12 px-3 rounded-md border border-input bg-background text-foreground"
+                className="w-full h-12 px-3 rounded-md border border-input bg-background text-foreground disabled:opacity-50"
+                disabled={isLoading}
               >
                 {countries.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -224,7 +241,7 @@ const Signup = () => {
                 Phone Number
               </label>
               <div className="flex gap-2">
-                <div className="w-24 h-12 px-3 rounded-md border border-input bg-muted flex items-center justify-center text-sm font-medium">
+                <div className="w-24 h-12 px-3 rounded-md border border-input bg-muted flex items-center justify-center text-sm font-medium disabled:opacity-50">
                   {selectedCountry?.dialCode}
                 </div>
                 <Input
@@ -233,6 +250,8 @@ const Signup = () => {
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                   placeholder="123456789"
                   className="flex-1 h-12"
+                  disabled={isLoading}
+                  required
                 />
               </div>
             </div>
@@ -257,6 +276,8 @@ const Signup = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="h-12"
+                disabled={isLoading}
+                required
               />
               <p className="text-xs text-muted-foreground mt-1">Must be at least 8 characters</p>
             </div>
@@ -271,6 +292,8 @@ const Signup = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 className="h-12"
+                disabled={isLoading}
+                required
               />
             </div>
           </div>
@@ -307,6 +330,8 @@ const Signup = () => {
                 placeholder="••••"
                 maxLength={4}
                 className="h-12 text-center text-2xl tracking-[0.5em]"
+                disabled={isLoading}
+                required
               />
             </div>
 
@@ -321,6 +346,8 @@ const Signup = () => {
                 placeholder="••••"
                 maxLength={4}
                 className="h-12 text-center text-2xl tracking-[0.5em]"
+                disabled={isLoading}
+                required
               />
             </div>
           </div>
@@ -394,6 +421,7 @@ const Signup = () => {
                   variant="outline"
                   onClick={handleBack}
                   className="flex-1 h-12"
+                  disabled={isLoading}
                 >
                   <ChevronLeft className="w-4 h-4 mr-1" />
                   Back
@@ -405,16 +433,28 @@ const Signup = () => {
                   type="button"
                   onClick={handleNext}
                   className="flex-1 h-12 bg-accent hover:bg-accent/90 text-accent-foreground"
+                  disabled={isLoading}
                 >
-                  Continue
-                  <ChevronRight className="w-4 h-4 ml-1" />
+                  {isLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <>
+                      Continue
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button
                   type="submit"
                   className="flex-1 h-12 bg-accent hover:bg-accent/90 text-accent-foreground"
+                  disabled={isLoading}
                 >
-                  Create Account
+                  {isLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    "Create Account"
+                  )}
                 </Button>
               )}
             </div>

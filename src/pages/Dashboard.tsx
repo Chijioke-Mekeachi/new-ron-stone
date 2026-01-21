@@ -1,10 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { databaseService, type Transaction, type Card, type SavingsGoal, type Notification } from "@/lib/databaseService";
+import { formatCurrency } from "@/lib/demoData";
 import LanguageSelector from "@/components/LanguageSelector";
 import {
   Home,
@@ -27,9 +29,11 @@ import {
   Sun,
   Download,
   Shield,
-  Camera
+  Camera,
+  CheckCircle,
+  Clock,
+  AlertCircle
 } from "lucide-react";
-import { demoTransactions, formatCurrency, type Transaction } from "@/lib/demoData";
 import { toast } from "@/hooks/use-toast";
 import SuccessModal from "@/components/SuccessModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -42,16 +46,30 @@ import PinVerificationModal from "@/components/dashboard/PinVerificationModal";
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
 const Dashboard = () => {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, updateBalance } = useAuth();
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  
   const [activeSection, setActiveSection] = useState<DashboardSection>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
-  const [transactions, setTransactions] = useState<Transaction[]>(demoTransactions);
-  const [balance, setBalance] = useState(user?.balance || 25000);
   
+  // Data states
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userCards, setUserCards] = useState<Card[]>([]);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  const [balance, setBalance] = useState(user?.balance || 25000);
+  const [isLoading, setIsLoading] = useState({
+    transactions: false,
+    cards: false,
+    savings: false,
+    notifications: false,
+    profile: false
+  });
+
   // Loading and modal states
   const [isTransferLoading, setIsTransferLoading] = useState(false);
   const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
@@ -89,33 +107,176 @@ const Dashboard = () => {
 
   // PIN verification for withdraw
   const [showWithdrawPinModal, setShowWithdrawPinModal] = useState(false);
-  const [pendingWithdraw, setPendingWithdraw] = useState(false);
-
+  
   // Cards state
-  const [userCards, setUserCards] = useState([
-    { id: 1, type: 'Virtual', number: '**** **** **** 4532', expires: '12/26', status: 'active' as 'active' | 'frozen' },
-    { id: 2, type: 'Physical', number: '**** **** **** 8891', expires: '08/27', status: 'active' as 'active' | 'frozen' },
-  ]);
   const [showNewCardModal, setShowNewCardModal] = useState(false);
   const [newCardType, setNewCardType] = useState<'Virtual' | 'Physical'>('Virtual');
 
-  // Profile picture state
-  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  // Profile state
+  const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
+  const [profileForm, setProfileForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    dob: '',
+    address: user?.address || {
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'US'
+    },
+    employment: user?.employment || {
+      occupation: '',
+      employer: '',
+      incomeRange: '',
+      sourceOfFunds: ''
+    },
+    identification: user?.identification || {
+      type: '',
+      number: '',
+      issueDate: '',
+      expiryDate: ''
+    }
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch data on component mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchAllData();
+      setBalance(user.balance);
+      if (user.profilePicture) {
+        setProfilePicture(user.profilePicture);
+      }
+    }
+  }, [user?.id]);
+
+  const fetchAllData = async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoading(prev => ({ ...prev, transactions: true }));
+      const transactionsData = await databaseService.getTransactions(user.id);
+      setTransactions(transactionsData);
+
+      setIsLoading(prev => ({ ...prev, cards: true }));
+      const cardsData = await databaseService.getCards(user.id);
+      setUserCards(cardsData.map(card => ({
+        id: card.id,
+        type: card.type as 'Virtual' | 'Physical',
+        number: `**** **** **** ${card.last_four}`,
+        expires: card.expires,
+        status: card.status as 'active' | 'frozen',
+        last_four: card.last_four
+      })));
+
+      setIsLoading(prev => ({ ...prev, savings: true }));
+      const savingsData = await databaseService.getSavingsGoals(user.id);
+      setSavingsGoals(savingsData);
+
+      setIsLoading(prev => ({ ...prev, notifications: true }));
+      const notificationsData = await databaseService.getNotifications(user.id);
+      setNotifications(notificationsData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading({
+        transactions: false,
+        cards: false,
+        savings: false,
+        notifications: false,
+        profile: false
+      });
+    }
+  };
+
+  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file || !user?.id) return;
+
+    try {
       if (file.size > 5 * 1024 * 1024) {
-        toast({ title: "File too large", description: "Please select an image under 5MB", variant: "destructive" });
+        toast({ 
+          title: "File too large", 
+          description: "Please select an image under 5MB", 
+          variant: "destructive" 
+        });
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePicture(reader.result as string);
-        toast({ title: "Profile picture updated!", description: "Your new profile picture has been saved." });
-      };
-      reader.readAsDataURL(file);
+
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      const publicUrl = await databaseService.uploadProfilePicture(user.id, file);
+      
+      await updateUser({ profilePicture: publicUrl });
+      setProfilePicture(publicUrl);
+      
+      toast({ 
+        title: "Profile picture updated!", 
+        description: "Your new profile picture has been saved." 
+      });
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload profile picture",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(prev => ({ ...prev, profile: false }));
+    }
+  };
+
+  const handleProfileUpdate = async (section: 'personal' | 'address' | 'employment' | 'identification') => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      
+      let updates: any = {};
+      
+      switch (section) {
+        case 'personal':
+          updates = {
+            first_name: profileForm.firstName,
+            last_name: profileForm.lastName,
+            email: profileForm.email,
+            phone: profileForm.phone
+          };
+          break;
+        case 'address':
+          updates = { address: profileForm.address };
+          break;
+        case 'employment':
+          updates = { employment: profileForm.employment };
+          break;
+        case 'identification':
+          updates = { identification: profileForm.identification };
+          break;
+      }
+
+      await updateUser(updates);
+      
+      toast({
+        title: "Profile updated!",
+        description: "Your profile information has been saved."
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update profile information",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(prev => ({ ...prev, profile: false }));
     }
   };
 
@@ -131,13 +292,15 @@ const Dashboard = () => {
     { id: 'support', label: t('dashboard.support'), icon: HelpCircle },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) return;
+
     const amount = parseFloat(transferForm.amount);
     if (amount > balance) {
       toast({ title: "Insufficient funds", variant: "destructive" });
@@ -146,34 +309,65 @@ const Dashboard = () => {
 
     setIsTransferLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Create transaction in database
+      const newTransaction = await databaseService.createTransaction({
+        user_id: user.id,
+        date: new Date().toISOString().split('T')[0],
+        type: 'debit',
+        amount: amount,
+        currency: transferForm.currency,
+        status: 'pending',
+        description: `Transfer to ${transferForm.recipientName}`,
+        recipient_name: transferForm.recipientName,
+        recipient_account: transferForm.recipientAccount,
+        bank_name: transferForm.narrative,
+        metadata: {
+          narrative: transferForm.narrative
+        }
+      });
 
-    const newTransaction: Transaction = {
-      id: `TXN${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      type: 'debit',
-      amount: amount,
-      currency: transferForm.currency,
-      status: 'completed',
-      description: `Transfer to ${transferForm.recipientName}`,
-      recipient: transferForm.recipientName
-    };
+      // Update balance
+      const newBalance = balance - amount;
+      await updateBalance(-amount);
+      setBalance(newBalance);
 
-    setTransactions([newTransaction, ...transactions]);
-    setBalance(prev => prev - amount);
-    updateUser({ balance: balance - amount });
-    
-    setIsTransferLoading(false);
-    
-    setSuccessModal({
-      isOpen: true,
-      title: "Transfer Successful!",
-      message: `Money has been sent to ${transferForm.recipientName}`,
-      amount: formatCurrency(amount, transferForm.currency)
-    });
-    
-    setTransferForm({ recipientName: '', recipientAccount: '', amount: '', currency: 'USD', narrative: '' });
+      // Update transactions list
+      setTransactions(prev => [newTransaction, ...prev]);
+
+      // Send notification
+      await databaseService.createNotification({
+        user_id: user.id,
+        title: 'Transfer Initiated',
+        message: `Your transfer of ${formatCurrency(amount, transferForm.currency)} to ${transferForm.recipientName} is being processed.`,
+        type: 'transfer',
+        read: false
+      });
+
+      setSuccessModal({
+        isOpen: true,
+        title: "Transfer Initiated!",
+        message: `Money transfer to ${transferForm.recipientName} has been initiated.`,
+        amount: formatCurrency(amount, transferForm.currency)
+      });
+
+      setTransferForm({ 
+        recipientName: '', 
+        recipientAccount: '', 
+        amount: '', 
+        currency: 'USD', 
+        narrative: '' 
+      });
+    } catch (error) {
+      console.error('Transfer error:', error);
+      toast({
+        title: "Transfer failed",
+        description: "Failed to process transfer",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTransferLoading(false);
+    }
   };
 
   const handleWithdraw = async (e: React.FormEvent) => {
@@ -198,87 +392,184 @@ const Dashboard = () => {
     
     setIsWithdrawLoading(true);
 
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      // Create transaction in database
+      const newTransaction = await databaseService.createTransaction({
+        user_id: user!.id,
+        date: new Date().toISOString().split('T')[0],
+        type: 'debit',
+        amount: amount,
+        currency: 'USD',
+        status: 'pending',
+        description: `Withdrawal to ${withdrawForm.destination}`,
+        metadata: {
+          destination: withdrawForm.destination,
+          bankName: withdrawForm.bankName,
+          accountNumber: withdrawForm.accountNumber,
+          cardLastFour: withdrawForm.cardNumber.slice(-4)
+        }
+      });
 
-    const newTransaction: Transaction = {
-      id: `TXN${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      type: 'debit',
-      amount: amount,
-      currency: 'USD',
-      status: 'pending',
-      description: `Withdrawal to ${withdrawForm.destination}`
-    };
+      // Update balance
+      const newBalance = balance - amount;
+      await updateBalance(-amount);
+      setBalance(newBalance);
 
-    setTransactions([newTransaction, ...transactions]);
-    setBalance(prev => prev - amount);
-    updateUser({ balance: balance - amount });
-    
-    setIsWithdrawLoading(false);
-    
-    setSuccessModal({
-      isOpen: true,
-      title: "Withdrawal Processing!",
-      message: `Your withdrawal is being processed and will be sent to your ${withdrawForm.destination === 'bank' ? 'bank account' : 'card'}`,
-      amount: formatCurrency(amount, 'USD')
-    });
-    
-    setWithdrawForm({ 
-      amount: '', 
-      destination: 'bank',
-      bankName: '',
-      accountNumber: '',
-      routingNumber: '',
-      accountHolderName: '',
-      cardNumber: '',
-      cardHolderName: '',
-      expiryDate: '',
-      cvv: ''
-    });
+      // Update transactions list
+      setTransactions(prev => [newTransaction, ...prev]);
+
+      // Send notification
+      await databaseService.createNotification({
+        user_id: user!.id,
+        title: 'Withdrawal Processing',
+        message: `Your withdrawal of ${formatCurrency(amount, 'USD')} is being processed.`,
+        type: 'withdrawal',
+        read: false
+      });
+
+      setSuccessModal({
+        isOpen: true,
+        title: "Withdrawal Processing!",
+        message: `Your withdrawal is being processed and will be sent to your ${withdrawForm.destination === 'bank' ? 'bank account' : 'card'}`,
+        amount: formatCurrency(amount, 'USD')
+      });
+
+      setWithdrawForm({ 
+        amount: '', 
+        destination: 'bank',
+        bankName: '',
+        accountNumber: '',
+        routingNumber: '',
+        accountHolderName: '',
+        cardNumber: '',
+        cardHolderName: '',
+        expiryDate: '',
+        cvv: ''
+      });
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      toast({
+        title: "Withdrawal failed",
+        description: "Failed to process withdrawal",
+        variant: "destructive"
+      });
+    } finally {
+      setIsWithdrawLoading(false);
+    }
   };
 
-  const toggleCardStatus = (cardId: number) => {
-    setUserCards(prev => prev.map(card => {
-      if (card.id === cardId) {
-        const newStatus = card.status === 'active' ? 'frozen' : 'active';
-        toast({
-          title: newStatus === 'frozen' ? "Card Frozen" : "Card Unfrozen",
-          description: `Your ${card.type} card has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`
-        });
-        return { ...card, status: newStatus };
-      }
-      return card;
-    }));
+  const toggleCardStatus = async (cardId: string) => {
+    try {
+      const card = userCards.find(c => c.id === cardId);
+      if (!card) return;
+
+      const newStatus = card.status === 'active' ? 'frozen' : 'active';
+      const updatedCard = await databaseService.updateCardStatus(cardId, newStatus);
+      
+      setUserCards(prev => prev.map(c => 
+        c.id === cardId ? { 
+          ...c, 
+          status: newStatus,
+          last_four: updatedCard.last_four 
+        } : c
+      ));
+
+      // Send notification
+      await databaseService.createNotification({
+        user_id: user!.id,
+        title: `Card ${newStatus === 'frozen' ? 'Frozen' : 'Activated'}`,
+        message: `Your ${card.type} card ending in ${card.number.slice(-4)} has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`,
+        type: 'card',
+        read: false
+      });
+
+      toast({
+        title: newStatus === 'frozen' ? "Card Frozen" : "Card Activated",
+        description: `Your card has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`
+      });
+    } catch (error) {
+      console.error('Error updating card status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update card status",
+        variant: "destructive"
+      });
+    }
   };
 
-  const requestNewCard = () => {
-    const newCard = {
-      id: Date.now(),
-      type: newCardType,
-      number: `**** **** **** ${Math.floor(1000 + Math.random() * 9000)}`,
-      expires: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getFullYear() + 3).slice(-2)}`,
-      status: 'active' as const
-    };
-    setUserCards(prev => [...prev, newCard]);
-    setShowNewCardModal(false);
-    toast({
-      title: "Card Requested",
-      description: `Your new ${newCardType} card has been requested and will be ready shortly.`
-    });
+  const requestNewCard = async () => {
+    if (!user?.id) return;
+
+    try {
+      const lastFour = Math.floor(1000 + Math.random() * 9000).toString();
+      const expires = `${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getFullYear() + 3).slice(-2)}`;
+      
+      const newCard = await databaseService.createCard({
+        user_id: user.id,
+        type: newCardType,
+        last_four: lastFour,
+        expires: expires,
+        status: 'active'
+      });
+
+      const formattedCard = {
+        id: newCard.id,
+        type: newCardType,
+        number: `**** **** **** ${lastFour}`,
+        expires: expires,
+        status: 'active' as const,
+        last_four: lastFour
+      };
+
+      setUserCards(prev => [...prev, formattedCard]);
+      setShowNewCardModal(false);
+
+      // Send notification
+      await databaseService.createNotification({
+        user_id: user.id,
+        title: 'New Card Requested',
+        message: `Your ${newCardType} card ending in ${lastFour} has been requested.`,
+        type: 'card',
+        read: false
+      });
+
+      toast({
+        title: "Card Requested",
+        description: `Your new ${newCardType} card has been requested and will be ready shortly.`
+      });
+    } catch (error) {
+      console.error('Error requesting card:', error);
+      toast({
+        title: "Request failed",
+        description: "Failed to request new card",
+        variant: "destructive"
+      });
+    }
   };
 
-  const cards = [
-    { id: 1, type: 'Virtual', number: '**** **** **** 4532', expires: '12/26', status: 'active' },
-    { id: 2, type: 'Physical', number: '**** **** **** 8891', expires: '08/27', status: 'active' },
-  ];
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      await databaseService.markNotificationAsRead(notificationId);
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, read: true } : n
+      ));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
 
-  const notifications = [
-    { id: 1, title: 'Transfer Received', message: 'You received $500 from John Doe', time: '2 hours ago', read: false },
-    { id: 2, title: 'Card Payment', message: 'Payment of $45.99 at Amazon', time: '5 hours ago', read: false },
-    { id: 3, title: 'Security Alert', message: 'New login from Chrome on Windows', time: '1 day ago', read: true },
-    { id: 4, title: 'Savings Goal', message: 'You reached 50% of your vacation goal!', time: '2 days ago', read: true },
-  ];
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'pending':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'failed':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -295,7 +586,10 @@ const Dashboard = () => {
                       {showBalance ? formatCurrency(balance, user?.currency || 'USD') : '••••••'}
                     </p>
                   </div>
-                  <button onClick={() => setShowBalance(!showBalance)}>
+                  <button 
+                    onClick={() => setShowBalance(!showBalance)}
+                    className="hover:opacity-80 transition-opacity"
+                  >
                     {showBalance ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
@@ -309,7 +603,12 @@ const Dashboard = () => {
                   <p className="text-muted-foreground text-sm">{t('dashboard.savingsBalance')}</p>
                   <PiggyBank className="w-5 h-5 text-accent" />
                 </div>
-                <p className="text-2xl font-bold">{formatCurrency(5000, 'USD')}</p>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(
+                    savingsGoals.reduce((sum, goal) => sum + goal.current_amount, 0) || 5000, 
+                    'USD'
+                  )}
+                </p>
                 <p className="text-sm text-green-500 mt-1">+2.5% APY</p>
               </div>
 
@@ -318,7 +617,14 @@ const Dashboard = () => {
                   <p className="text-muted-foreground text-sm">This Month</p>
                   <TrendingUp className="w-5 h-5 text-green-500" />
                 </div>
-                <p className="text-2xl font-bold text-green-500">+$2,450</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {formatCurrency(
+                    transactions
+                      .filter(tx => tx.type === 'credit')
+                      .reduce((sum, tx) => sum + tx.amount, 0),
+                    'USD'
+                  )}
+                </p>
                 <p className="text-sm text-muted-foreground mt-1">Income</p>
               </div>
             </div>
@@ -346,46 +652,64 @@ const Dashboard = () => {
             <div className="bg-card rounded-2xl border border-border p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg">{t('dashboard.recentTransactions')}</h3>
-                <button 
-                  onClick={() => setActiveSection('transactions')}
-                  className="text-accent text-sm hover:underline"
-                >
-                  {t('dashboard.viewAll')}
-                </button>
+                {isLoading.transactions ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <button 
+                    onClick={() => setActiveSection('transactions')}
+                    className="text-accent text-sm hover:underline"
+                  >
+                    {t('dashboard.viewAll')}
+                  </button>
+                )}
               </div>
-              <div className="space-y-4">
-                {transactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        tx.type === 'credit' ? 'bg-green-500/10' : 'bg-red-500/10'
-                      }`}>
-                        {tx.type === 'credit' ? (
-                          <TrendingUp className="w-5 h-5 text-green-500" />
-                        ) : (
-                          <TrendingDown className="w-5 h-5 text-red-500" />
-                        )}
+              {isLoading.transactions ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {transactions.slice(0, 5).map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          tx.type === 'credit' ? 'bg-green-500/10' : 'bg-red-500/10'
+                        }`}>
+                          {tx.type === 'credit' ? (
+                            <TrendingUp className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <TrendingDown className="w-5 h-5 text-red-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{tx.description}</p>
+                          <p className="text-sm text-muted-foreground">{tx.date}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        <p className="text-sm text-muted-foreground">{tx.date}</p>
+                      <div className="text-right">
+                        <p className={`font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
+                          {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                        </p>
+                        <div className="flex items-center justify-end gap-2 mt-1">
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                            tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
+                            'bg-red-500/10 text-red-500'
+                          }`}>
+                            {tx.status}
+                          </span>
+                          {getStatusIcon(tx.status)}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
-                        {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-                      </p>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                        tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                        'bg-red-500/10 text-red-500'
-                      }`}>
-                        {tx.status}
-                      </span>
+                  ))}
+                  {transactions.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No transactions yet
                     </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -402,47 +726,66 @@ const Dashboard = () => {
             
             {/* Transactions Table */}
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-bold text-xl mb-6">{t('dashboard.transactions')}</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.date')}</th>
-                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.description')}</th>
-                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.type')}</th>
-                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.amount')}</th>
-                      <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.status')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} className="border-b border-border last:border-0">
-                        <td className="py-4">{tx.date}</td>
-                        <td className="py-4">{tx.description}</td>
-                        <td className="py-4">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            tx.type === 'credit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                          }`}>
-                            {tx.type === 'credit' ? t('dashboard.credit') : t('dashboard.debit')}
-                          </span>
-                        </td>
-                        <td className={`py-4 font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
-                          {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-                        </td>
-                        <td className="py-4">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                            tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                            'bg-red-500/10 text-red-500'
-                          }`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-xl">{t('dashboard.transactions')}</h3>
+                {isLoading.transactions && <LoadingSpinner size="sm" />}
               </div>
+              {isLoading.transactions ? (
+                <div className="flex justify-center py-12">
+                  <LoadingSpinner size="lg" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.date')}</th>
+                        <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.description')}</th>
+                        <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.type')}</th>
+                        <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.amount')}</th>
+                        <th className="text-left py-3 text-muted-foreground font-medium">{t('dashboard.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
+                          <td className="py-4">{tx.date}</td>
+                          <td className="py-4">{tx.description}</td>
+                          <td className="py-4">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              tx.type === 'credit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                            }`}>
+                              {tx.type === 'credit' ? t('dashboard.credit') : t('dashboard.debit')}
+                            </span>
+                          </td>
+                          <td className={`py-4 font-semibold ${tx.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
+                            {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                          </td>
+                          <td className="py-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                tx.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                                tx.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
+                                'bg-red-500/10 text-red-500'
+                              }`}>
+                                {tx.status}
+                              </span>
+                              {getStatusIcon(tx.status)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {transactions.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                            No transactions found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -451,28 +794,58 @@ const Dashboard = () => {
         return (
           <TransferForm 
             balance={balance}
-            onTransferComplete={(transfer) => {
-              const newTransaction: Transaction = {
-                id: `TXN${Date.now()}`,
-                date: new Date().toISOString().split('T')[0],
-                type: 'debit',
-                amount: transfer.amount,
-                currency: 'USD',
-                status: 'pending',
-                description: `Transfer to ${transfer.recipientName}`,
-                recipient: transfer.recipientName
-              };
-              
-              setTransactions([newTransaction, ...transactions]);
-              setBalance(prev => prev - transfer.amount);
-              updateUser({ balance: balance - transfer.amount });
-              
-              setSuccessModal({
-                isOpen: true,
-                title: "Transfer Initiated!",
-                message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
-                amount: formatCurrency(transfer.amount, 'USD')
-              });
+            onTransferComplete={async (transfer) => {
+              if (!user?.id) return;
+
+              try {
+                setIsTransferLoading(true);
+                
+                const newTransaction = await databaseService.createTransaction({
+                  user_id: user.id,
+                  date: new Date().toISOString().split('T')[0],
+                  type: 'debit',
+                  amount: transfer.amount,
+                  currency: 'USD',
+                  status: 'pending',
+                  description: `Transfer to ${transfer.recipientName}`,
+                  recipient_name: transfer.recipientName,
+                  bank_name: transfer.bankName,
+                  metadata: {
+                    bankName: transfer.bankName,
+                    swiftCode: transfer.swiftCode
+                  }
+                });
+                
+                setTransactions(prev => [newTransaction, ...prev]);
+                const newBalance = balance - transfer.amount;
+                setBalance(newBalance);
+                await updateUser({ balance: newBalance });
+                
+                // Send notification
+                await databaseService.createNotification({
+                  user_id: user.id,
+                  title: 'Transfer Initiated',
+                  message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
+                  type: 'transfer',
+                  read: false
+                });
+                
+                setSuccessModal({
+                  isOpen: true,
+                  title: "Transfer Initiated!",
+                  message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
+                  amount: formatCurrency(transfer.amount, 'USD')
+                });
+              } catch (error) {
+                console.error('Transfer error:', error);
+                toast({
+                  title: "Transfer failed",
+                  description: "Failed to process transfer",
+                  variant: "destructive"
+                });
+              } finally {
+                setIsTransferLoading(false);
+              }
             }}
           />
         );
@@ -491,6 +864,8 @@ const Dashboard = () => {
                     onChange={(e) => setWithdrawForm({...withdrawForm, amount: e.target.value})}
                     placeholder="0.00"
                     required
+                    min="1"
+                    step="0.01"
                   />
                 </div>
                 <div>
@@ -622,44 +997,69 @@ const Dashboard = () => {
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-gradient-to-br from-accent to-accent/70 p-6 rounded-2xl text-accent-foreground">
                 <p className="text-accent-foreground/80 text-sm">{t('dashboard.savingsBalance')}</p>
-                <p className="text-3xl font-bold mt-1">{formatCurrency(5000, 'USD')}</p>
+                <p className="text-3xl font-bold mt-1">
+                  {formatCurrency(
+                    savingsGoals.reduce((sum, goal) => sum + goal.current_amount, 0) || 5000, 
+                    'USD'
+                  )}
+                </p>
               </div>
               <div className="bg-card p-6 rounded-2xl border border-border">
                 <p className="text-muted-foreground text-sm">{t('dashboard.interestRate')}</p>
-                <p className="text-3xl font-bold mt-1 text-green-500">2.5%</p>
+                <p className="text-3xl font-bold mt-1 text-green-500">
+                  {savingsGoals[0]?.interest_rate || 2.5}%
+                </p>
                 <p className="text-sm text-muted-foreground">APY</p>
               </div>
               <div className="bg-card p-6 rounded-2xl border border-border">
                 <p className="text-muted-foreground text-sm">{t('dashboard.totalEarned')}</p>
-                <p className="text-3xl font-bold mt-1">{formatCurrency(125, 'USD')}</p>
+                <p className="text-3xl font-bold mt-1">
+                  {formatCurrency(
+                    savingsGoals.reduce((sum, goal) => sum + (goal.current_amount * (goal.interest_rate || 2.5) / 100 / 12), 0) || 125,
+                    'USD'
+                  )}
+                </p>
                 <p className="text-sm text-muted-foreground">This year</p>
               </div>
             </div>
 
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-bold text-lg mb-4">Savings Goals</h3>
-              <div className="space-y-4">
-                {[
-                  { name: 'Vacation Fund', current: 2500, target: 5000 },
-                  { name: 'Emergency Fund', current: 8000, target: 10000 },
-                  { name: 'New Car', current: 3000, target: 15000 },
-                ].map((goal, i) => (
-                  <div key={i} className="p-4 bg-secondary/30 rounded-xl">
-                    <div className="flex justify-between mb-2">
-                      <span className="font-medium">{goal.name}</span>
-                      <span className="text-muted-foreground">
-                        {formatCurrency(goal.current, 'USD')} / {formatCurrency(goal.target, 'USD')}
-                      </span>
-                    </div>
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div 
-                        className="bg-accent h-2 rounded-full transition-all"
-                        style={{ width: `${(goal.current / goal.target) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">Savings Goals</h3>
+                {isLoading.savings && <LoadingSpinner size="sm" />}
               </div>
+              {isLoading.savings ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(savingsGoals.length > 0 ? savingsGoals : [
+                    { id: '1', name: 'Vacation Fund', current_amount: 2500, target_amount: 5000, interest_rate: 2.5 },
+                    { id: '2', name: 'Emergency Fund', current_amount: 8000, target_amount: 10000, interest_rate: 2.5 },
+                    { id: '3', name: 'New Car', current_amount: 3000, target_amount: 15000, interest_rate: 2.5 },
+                  ]).map((goal) => (
+                    <div key={goal.id} className="p-4 bg-secondary/30 rounded-xl">
+                      <div className="flex justify-between mb-2">
+                        <span className="font-medium">{goal.name}</span>
+                        <span className="text-muted-foreground">
+                          {formatCurrency(goal.current_amount, 'USD')} / {formatCurrency(goal.target_amount, 'USD')}
+                        </span>
+                      </div>
+                      <div className="w-full bg-secondary rounded-full h-2">
+                        <div 
+                          className="bg-accent h-2 rounded-full transition-all"
+                          style={{ width: `${(goal.current_amount / goal.target_amount) * 100}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+                        <span>{((goal.current_amount / goal.target_amount) * 100).toFixed(1)}% complete</span>
+                        <span>{goal.interest_rate}% APY</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -669,66 +1069,82 @@ const Dashboard = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-xl">{t('dashboard.cards')}</h3>
-              <Button 
-                className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                onClick={() => setShowNewCardModal(true)}
-              >
-                <CreditCard className="w-4 h-4 mr-2" />
-                Request New Card
-              </Button>
+              <div className="flex items-center gap-2">
+                {isLoading.cards && <LoadingSpinner size="sm" />}
+                <Button 
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={() => setShowNewCardModal(true)}
+                  disabled={isLoading.cards}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Request New Card
+                </Button>
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {userCards.map((card) => (
-                <div 
-                  key={card.id} 
-                  className={`relative p-6 rounded-2xl text-primary-foreground overflow-hidden transition-all ${
-                    card.status === 'frozen' 
-                      ? 'bg-gradient-to-br from-gray-500 to-gray-700 opacity-75' 
-                      : 'bg-gradient-to-br from-primary to-navy-light'
-                  }`}
-                >
-                  <div className="absolute top-4 right-4">
-                    <CreditCard className="w-8 h-8 opacity-50" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-primary-foreground/70">{card.type} Card</p>
-                    {card.status === 'frozen' && (
-                      <span className="text-xs bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full">
-                        Frozen
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xl font-mono mt-4 tracking-wider">{card.number}</p>
-                  <div className="flex justify-between items-end mt-6">
-                    <div>
-                      <p className="text-xs text-primary-foreground/70">{t('dashboard.expires')}</p>
-                      <p className="font-medium">{card.expires}</p>
+            {isLoading.cards ? (
+              <div className="flex justify-center py-12">
+                <LoadingSpinner size="lg" />
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {userCards.map((card) => (
+                  <div 
+                    key={card.id} 
+                    className={`relative p-6 rounded-2xl text-primary-foreground overflow-hidden transition-all ${
+                      card.status === 'frozen' 
+                        ? 'bg-gradient-to-br from-gray-500 to-gray-700 opacity-75' 
+                        : 'bg-gradient-to-br from-primary to-navy-light'
+                    }`}
+                  >
+                    <div className="absolute top-4 right-4">
+                      <CreditCard className="w-8 h-8 opacity-50" />
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className={`border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 ${
-                        card.status === 'frozen' ? 'border-blue-300 text-blue-200' : ''
-                      }`}
-                      onClick={() => toggleCardStatus(card.id)}
-                    >
-                      {card.status === 'active' ? (
-                        <>
-                          <Shield className="w-3 h-3 mr-1" />
-                          {t('dashboard.freeze')}
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="w-3 h-3 mr-1" />
-                          {t('dashboard.unfreeze')}
-                        </>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-primary-foreground/70">{card.type} Card</p>
+                      {card.status === 'frozen' && (
+                        <span className="text-xs bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full">
+                          Frozen
+                        </span>
                       )}
-                    </Button>
+                    </div>
+                    <p className="text-xl font-mono mt-4 tracking-wider">{card.number}</p>
+                    <div className="flex justify-between items-end mt-6">
+                      <div>
+                        <p className="text-xs text-primary-foreground/70">{t('dashboard.expires')}</p>
+                        <p className="font-medium">{card.expires}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={`border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 ${
+                          card.status === 'frozen' ? 'border-blue-300 text-blue-200' : ''
+                        }`}
+                        onClick={() => toggleCardStatus(card.id)}
+                      >
+                        {card.status === 'active' ? (
+                          <>
+                            <Shield className="w-3 h-3 mr-1" />
+                            {t('dashboard.freeze')}
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="w-3 h-3 mr-1" />
+                            {t('dashboard.unfreeze')}
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+                {userCards.length === 0 && (
+                  <div className="col-span-2 text-center py-12">
+                    <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No cards yet. Request your first card!</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* New Card Request Modal */}
             {showNewCardModal && (
@@ -807,7 +1223,7 @@ const Dashboard = () => {
 
       case 'profile':
         return (
-          <div className="max-w-2xl mx-auto space-y-6 animate-fade-up">
+          <div className="max-w-2xl mx-auto space-y-6">
             {/* Profile Picture Section */}
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">Profile Picture</h3>
@@ -830,9 +1246,14 @@ const Dashboard = () => {
                   </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-8 h-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                    disabled={isLoading.profile}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
                   >
-                    <Camera className="w-4 h-4" />
+                    {isLoading.profile ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -840,6 +1261,7 @@ const Dashboard = () => {
                     accept="image/*"
                     onChange={handleProfilePictureChange}
                     className="hidden"
+                    disabled={isLoading.profile}
                   />
                 </div>
                 <div>
@@ -857,27 +1279,41 @@ const Dashboard = () => {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">{t('auth.firstName')}</label>
-                    <Input defaultValue={user?.firstName} />
+                    <Input 
+                      value={profileForm.firstName}
+                      onChange={(e) => setProfileForm({...profileForm, firstName: e.target.value})}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">{t('auth.lastName')}</label>
-                    <Input defaultValue={user?.lastName} />
+                    <Input 
+                      value={profileForm.lastName}
+                      onChange={(e) => setProfileForm({...profileForm, lastName: e.target.value})}
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">{t('auth.email')}</label>
-                  <Input defaultValue={user?.email} type="email" />
+                  <Input 
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
+                    type="email" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">{t('dashboard.phone')}</label>
-                  <Input placeholder="+1 (555) 000-0000" />
+                  <Input 
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})}
+                    placeholder="+1 (555) 000-0000" 
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Date of Birth</label>
-                  <Input type="date" placeholder="MM/DD/YYYY" />
-                </div>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  {t('dashboard.updateProfile')}
+                <Button 
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={() => handleProfileUpdate('personal')}
+                  disabled={isLoading.profile}
+                >
+                  {isLoading.profile ? <LoadingSpinner size="sm" /> : t('dashboard.updateProfile')}
                 </Button>
               </div>
             </div>
@@ -888,26 +1324,61 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Street Address</label>
-                  <Input placeholder="123 Main Street" />
+                  <Input 
+                    value={profileForm.address?.street || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      address: {...profileForm.address, street: e.target.value}
+                    })}
+                    placeholder="123 Main Street" 
+                  />
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">City</label>
-                    <Input placeholder="New York" />
+                    <Input 
+                      value={profileForm.address?.city || ''}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        address: {...profileForm.address, city: e.target.value}
+                      })}
+                      placeholder="New York" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">State/Province</label>
-                    <Input placeholder="NY" />
+                    <Input 
+                      value={profileForm.address?.state || ''}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        address: {...profileForm.address, state: e.target.value}
+                      })}
+                      placeholder="NY" 
+                    />
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">ZIP/Postal Code</label>
-                    <Input placeholder="10001" />
+                    <Input 
+                      value={profileForm.address?.zip || ''}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        address: {...profileForm.address, zip: e.target.value}
+                      })}
+                      placeholder="10001" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Country</label>
-                    <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                    <select 
+                      value={profileForm.address?.country || 'US'}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        address: {...profileForm.address, country: e.target.value}
+                      })}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground"
+                    >
                       <option value="US">United States</option>
                       <option value="CA">Canada</option>
                       <option value="UK">United Kingdom</option>
@@ -917,8 +1388,12 @@ const Dashboard = () => {
                     </select>
                   </div>
                 </div>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  Update Address
+                <Button 
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={() => handleProfileUpdate('address')}
+                  disabled={isLoading.profile}
+                >
+                  {isLoading.profile ? <LoadingSpinner size="sm" /> : 'Update Address'}
                 </Button>
               </div>
             </div>
@@ -929,15 +1404,36 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Occupation</label>
-                  <Input placeholder="Software Engineer" />
+                  <Input 
+                    value={profileForm.employment?.occupation || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      employment: {...profileForm.employment, occupation: e.target.value}
+                    })}
+                    placeholder="Software Engineer" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Employer Name</label>
-                  <Input placeholder="Company Name" />
+                  <Input 
+                    value={profileForm.employment?.employer || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      employment: {...profileForm.employment, employer: e.target.value}
+                    })}
+                    placeholder="Company Name" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Annual Income Range</label>
-                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                  <select 
+                    value={profileForm.employment?.incomeRange || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      employment: {...profileForm.employment, incomeRange: e.target.value}
+                    })}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground"
+                  >
                     <option value="">Select income range</option>
                     <option value="0-25000">$0 - $25,000</option>
                     <option value="25000-50000">$25,000 - $50,000</option>
@@ -949,7 +1445,14 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Source of Funds</label>
-                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                  <select 
+                    value={profileForm.employment?.sourceOfFunds || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      employment: {...profileForm.employment, sourceOfFunds: e.target.value}
+                    })}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground"
+                  >
                     <option value="">Select source</option>
                     <option value="salary">Salary/Employment</option>
                     <option value="business">Business Income</option>
@@ -958,8 +1461,12 @@ const Dashboard = () => {
                     <option value="other">Other</option>
                   </select>
                 </div>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  Update Employment Info
+                <Button 
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={() => handleProfileUpdate('employment')}
+                  disabled={isLoading.profile}
+                >
+                  {isLoading.profile ? <LoadingSpinner size="sm" /> : 'Update Employment Info'}
                 </Button>
               </div>
             </div>
@@ -970,7 +1477,14 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">ID Type</label>
-                  <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground">
+                  <select 
+                    value={profileForm.identification?.type || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      identification: {...profileForm.identification, type: e.target.value}
+                    })}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground"
+                  >
                     <option value="">Select ID type</option>
                     <option value="passport">Passport</option>
                     <option value="drivers_license">Driver's License</option>
@@ -980,16 +1494,38 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">ID Number</label>
-                  <Input type="password" placeholder="••••••••••" />
+                  <Input 
+                    type="password"
+                    value={profileForm.identification?.number || ''}
+                    onChange={(e) => setProfileForm({
+                      ...profileForm, 
+                      identification: {...profileForm.identification, number: e.target.value}
+                    })}
+                    placeholder="••••••••••" 
+                  />
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Issue Date</label>
-                    <Input type="date" />
+                    <Input 
+                      type="date"
+                      value={profileForm.identification?.issueDate || ''}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        identification: {...profileForm.identification, issueDate: e.target.value}
+                      })}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Expiry Date</label>
-                    <Input type="date" />
+                    <Input 
+                      type="date"
+                      value={profileForm.identification?.expiryDate || ''}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm, 
+                        identification: {...profileForm.identification, expiryDate: e.target.value}
+                      })}
+                    />
                   </div>
                 </div>
                 <div className="p-4 bg-secondary/50 rounded-lg">
@@ -998,8 +1534,12 @@ const Dashboard = () => {
                     Your identification documents are encrypted and stored securely. We only use this information for verification purposes.
                   </p>
                 </div>
-                <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  Update ID Information
+                <Button 
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  onClick={() => handleProfileUpdate('identification')}
+                  disabled={isLoading.profile}
+                >
+                  {isLoading.profile ? <LoadingSpinner size="sm" /> : 'Update ID Information'}
                 </Button>
               </div>
             </div>
@@ -1054,23 +1594,48 @@ const Dashboard = () => {
             
             {/* Recent Notifications */}
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-bold text-xl mb-6">{t('dashboard.notifications')}</h3>
-              <div className="space-y-4">
-                {notifications.map((notif) => (
-                  <div 
-                    key={notif.id} 
-                    className={`p-4 rounded-xl border ${notif.read ? 'border-border bg-secondary/30' : 'border-accent/30 bg-accent/5'}`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">{notif.title}</p>
-                        <p className="text-muted-foreground text-sm mt-1">{notif.message}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{notif.time}</span>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-xl">{t('dashboard.notifications')}</h3>
+                {isLoading.notifications && <LoadingSpinner size="sm" />}
               </div>
+              {isLoading.notifications ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {notifications.map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      className={`p-4 rounded-xl border cursor-pointer hover:bg-secondary/50 transition-colors ${
+                        notif.read ? 'border-border bg-secondary/30' : 'border-accent/30 bg-accent/5'
+                      }`}
+                      onClick={() => markNotificationAsRead(notif.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{notif.title}</p>
+                          <p className="text-muted-foreground text-sm mt-1">{notif.message}</p>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(notif.created_at).toLocaleDateString()}
+                          </span>
+                          {!notif.read && (
+                            <span className="mt-1 w-2 h-2 bg-accent rounded-full animate-pulse" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {notifications.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Bell className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No notifications yet</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1178,11 +1743,21 @@ const Dashboard = () => {
               </button>
               <LanguageSelector />
               <button 
-                onClick={() => setActiveSection('notifications')}
+                onClick={() => {
+                  setActiveSection('notifications');
+                  // Mark all as read when clicking bell
+                  notifications.forEach(async (n) => {
+                    if (!n.read) {
+                      await markNotificationAsRead(n.id);
+                    }
+                  });
+                }}
                 className="relative p-2 hover:bg-secondary rounded-lg transition-colors"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                {notifications.some(n => !n.read) && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                )}
               </button>
               <button 
                 onClick={() => setActiveSection('profile')}
