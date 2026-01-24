@@ -32,7 +32,8 @@ import {
   Camera,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import SuccessModal from "@/components/SuccessModal";
@@ -42,6 +43,8 @@ import PushNotifications from "@/components/dashboard/PushNotifications";
 import TransferForm from "@/components/dashboard/TransferForm";
 import TransactionPinSetup from "@/components/dashboard/TransactionPinSetup";
 import PinVerificationModal from "@/components/dashboard/PinVerificationModal";
+import { ActiveUserGuard } from "@/components/ActiveUserGuard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
@@ -70,7 +73,6 @@ const Dashboard = () => {
     profile: false
   });
 
-  // Loading and modal states
   const [isTransferLoading, setIsTransferLoading] = useState(false);
   const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
   const [successModal, setSuccessModal] = useState<{
@@ -93,12 +95,10 @@ const Dashboard = () => {
   const [withdrawForm, setWithdrawForm] = useState({
     amount: '',
     destination: 'bank',
-    // Bank details
     bankName: '',
     accountNumber: '',
     routingNumber: '',
     accountHolderName: '',
-    // Card details
     cardNumber: '',
     cardHolderName: '',
     expiryDate: '',
@@ -143,16 +143,33 @@ const Dashboard = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch data on component mount and when user changes
+  // Helper function to check if user can perform actions
+  const checkUserActive = (actionName: string = 'perform this action'): boolean => {
+    if (!user?.isActive) {
+      toast({
+        title: "Account Suspended",
+        description: `Your account is currently suspended. Please contact support to ${actionName}.`,
+        variant: "destructive",
+        duration: 5000,
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Effect for authentication check
   useEffect(() => {
-    if (user?.id) {
+    if (isLoading) return;
+    if (!user) navigate('/login');
+  }, [user, isLoading, navigate]);
+
+  // Fetch data when user is available
+  useEffect(() => {
+    if (!isLoading && user?.id) {
       fetchAllData();
       setBalance(user.balance);
-      if (user.profilePicture) {
-        setProfilePicture(user.profilePicture);
-      }
     }
-  }, [user?.id]);
+  }, [user?.id, isLoading]);
 
   const fetchAllData = async () => {
     if (!user?.id) return;
@@ -293,12 +310,22 @@ const Dashboard = () => {
   ];
 
   const handleLogout = async () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
+    
     await logout();
     navigate('/');
   };
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is active
+    if (!checkUserActive('make transfers')) {
+      return;
+    }
+    
     if (!user?.id) return;
 
     const amount = parseFloat(transferForm.amount);
@@ -341,7 +368,8 @@ const Dashboard = () => {
         title: 'Transfer Initiated',
         message: `Your transfer of ${formatCurrency(amount, transferForm.currency)} to ${transferForm.recipientName} is being processed.`,
         type: 'transfer',
-        read: false
+        read: false,
+        created_at: ""
       });
 
       setSuccessModal({
@@ -372,6 +400,12 @@ const Dashboard = () => {
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is active
+    if (!checkUserActive('make withdrawals')) {
+      return;
+    }
+    
     const amount = parseFloat(withdrawForm.amount);
     if (amount > balance) {
       toast({ title: "Insufficient funds", variant: "destructive" });
@@ -389,6 +423,11 @@ const Dashboard = () => {
   const handleWithdrawPinVerified = async () => {
     setShowWithdrawPinModal(false);
     const amount = parseFloat(withdrawForm.amount);
+    
+    // Double-check user is active
+    if (!checkUserActive('make withdrawals')) {
+      return;
+    }
     
     setIsWithdrawLoading(true);
 
@@ -424,7 +463,8 @@ const Dashboard = () => {
         title: 'Withdrawal Processing',
         message: `Your withdrawal of ${formatCurrency(amount, 'USD')} is being processed.`,
         type: 'withdrawal',
-        read: false
+        read: false,
+        created_at: ""
       });
 
       setSuccessModal({
@@ -459,6 +499,11 @@ const Dashboard = () => {
   };
 
   const toggleCardStatus = async (cardId: string) => {
+    // Check if user is active
+    if (!checkUserActive('manage cards')) {
+      return;
+    }
+    
     try {
       const card = userCards.find(c => c.id === cardId);
       if (!card) return;
@@ -480,7 +525,8 @@ const Dashboard = () => {
         title: `Card ${newStatus === 'frozen' ? 'Frozen' : 'Activated'}`,
         message: `Your ${card.type} card ending in ${card.number.slice(-4)} has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`,
         type: 'card',
-        read: false
+        read: false,
+        created_at: ""
       });
 
       toast({
@@ -498,6 +544,11 @@ const Dashboard = () => {
   };
 
   const requestNewCard = async () => {
+    // Check if user is active
+    if (!checkUserActive('request new cards')) {
+      return;
+    }
+    
     if (!user?.id) return;
 
     try {
@@ -509,7 +560,8 @@ const Dashboard = () => {
         type: newCardType,
         last_four: lastFour,
         expires: expires,
-        status: 'active'
+        status: 'active',
+        number: undefined
       });
 
       const formattedCard = {
@@ -530,7 +582,8 @@ const Dashboard = () => {
         title: 'New Card Requested',
         message: `Your ${newCardType} card ending in ${lastFour} has been requested.`,
         type: 'card',
-        read: false
+        read: false,
+        created_at: ""
       });
 
       toast({
@@ -571,11 +624,66 @@ const Dashboard = () => {
     }
   };
 
+  // Quick Actions Component with disabled state for inactive users
+  const QuickAction = ({ 
+    icon: Icon, 
+    label, 
+    section, 
+    disabled = false 
+  }: { 
+    icon: any; 
+    label: string; 
+    section: DashboardSection;
+    disabled?: boolean;
+  }) => (
+    <button
+      onClick={() => {
+        if (!disabled) {
+          setActiveSection(section);
+        } else {
+          checkUserActive(`access ${label.toLowerCase()}`);
+        }
+      }}
+      disabled={disabled}
+      className={`p-4 bg-card rounded-xl border transition-all group ${
+        disabled 
+          ? 'border-border/50 opacity-50 cursor-not-allowed' 
+          : 'border-border hover:border-accent/50 cursor-pointer'
+      }`}
+    >
+      <Icon className={`w-6 h-6 mb-2 transition-transform ${
+        disabled 
+          ? 'text-muted-foreground' 
+          : 'text-accent group-hover:scale-110'
+      }`} />
+      <p className={`font-medium text-sm ${
+        disabled ? 'text-muted-foreground' : ''
+      }`}>
+        {label}
+        {disabled && (
+          <Lock className="w-3 h-3 ml-1 inline opacity-50" />
+        )}
+      </p>
+    </button>
+  );
+
   const renderContent = () => {
     switch (activeSection) {
       case 'overview':
         return (
           <div className="space-y-6">
+            {/* Suspension Alert */}
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Account Suspended</AlertTitle>
+                <AlertDescription>
+                  Your account is currently suspended. You can view your account information 
+                  but cannot perform any transactions. Please contact support to reactivate your account.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Balance Cards */}
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-gradient-to-br from-primary to-navy-light p-6 rounded-2xl text-primary-foreground">
@@ -596,6 +704,12 @@ const Dashboard = () => {
                 <p className="text-sm text-primary-foreground/70">
                   {t('dashboard.accountNumber')}: {user?.accountNumber}
                 </p>
+                {!user?.isActive && (
+                  <div className="mt-2 flex items-center gap-1 text-xs text-yellow-200">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>Account Suspended</span>
+                  </div>
+                )}
               </div>
               
               <div className="bg-card p-6 rounded-2xl border border-border">
@@ -631,21 +745,30 @@ const Dashboard = () => {
 
             {/* Quick Actions */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { icon: Send, label: t('dashboard.transfer'), section: 'transfer' as DashboardSection },
-                { icon: ArrowDownToLine, label: t('dashboard.withdraw'), section: 'withdraw' as DashboardSection },
-                { icon: CreditCard, label: t('dashboard.cards'), section: 'cards' as DashboardSection },
-                { icon: PiggyBank, label: t('dashboard.savings'), section: 'savings' as DashboardSection },
-              ].map((action, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveSection(action.section)}
-                  className="p-4 bg-card rounded-xl border border-border hover:border-accent/50 transition-all group"
-                >
-                  <action.icon className="w-6 h-6 text-accent mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="font-medium text-sm">{action.label}</p>
-                </button>
-              ))}
+              <QuickAction 
+                icon={Send} 
+                label={t('dashboard.transfer')} 
+                section="transfer"
+                disabled={!user?.isActive}
+              />
+              <QuickAction 
+                icon={ArrowDownToLine} 
+                label={t('dashboard.withdraw')} 
+                section="withdraw"
+                disabled={!user?.isActive}
+              />
+              <QuickAction 
+                icon={CreditCard} 
+                label={t('dashboard.cards')} 
+                section="cards"
+                disabled={!user?.isActive}
+              />
+              <QuickAction 
+                icon={PiggyBank} 
+                label={t('dashboard.savings')} 
+                section="savings"
+                disabled={!user?.isActive}
+              />
             </div>
 
             {/* Recent Transactions */}
@@ -717,6 +840,17 @@ const Dashboard = () => {
       case 'transactions':
         return (
           <div className="space-y-6">
+            {/* Suspension Alert */}
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>View Only Mode</AlertTitle>
+                <AlertDescription>
+                  Your account is suspended. You can view your transaction history but cannot initiate new transactions.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {/* Export Section */}
             <TransactionExport 
               transactions={transactions}
@@ -792,201 +926,249 @@ const Dashboard = () => {
 
       case 'transfer':
         return (
-          <TransferForm 
-            balance={balance}
-            onTransferComplete={async (transfer) => {
-              if (!user?.id) return;
+          <div className="space-y-6">
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Transfer Disabled</AlertTitle>
+                <AlertDescription>
+                  Transfers are disabled while your account is suspended. Please contact support to reactivate your account.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <TransferForm 
+              balance={balance}
+              onTransferComplete={async (transfer) => {
+                // Check if user is active
+                if (!checkUserActive('make transfers')) {
+                  return;
+                }
+                
+                if (!user?.id) return;
 
-              try {
-                setIsTransferLoading(true);
-                
-                const newTransaction = await databaseService.createTransaction({
-                  user_id: user.id,
-                  date: new Date().toISOString().split('T')[0],
-                  type: 'debit',
-                  amount: transfer.amount,
-                  currency: 'USD',
-                  status: 'pending',
-                  description: `Transfer to ${transfer.recipientName}`,
-                  recipient_name: transfer.recipientName,
-                  bank_name: transfer.bankName,
-                  metadata: {
-                    bankName: transfer.bankName,
-                    swiftCode: transfer.swiftCode
-                  }
-                });
-                
-                setTransactions(prev => [newTransaction, ...prev]);
-                const newBalance = balance - transfer.amount;
-                setBalance(newBalance);
-                await updateUser({ balance: newBalance });
-                
-                // Send notification
-                await databaseService.createNotification({
-                  user_id: user.id,
-                  title: 'Transfer Initiated',
-                  message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
-                  type: 'transfer',
-                  read: false
-                });
-                
-                setSuccessModal({
-                  isOpen: true,
-                  title: "Transfer Initiated!",
-                  message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
-                  amount: formatCurrency(transfer.amount, 'USD')
-                });
-              } catch (error) {
-                console.error('Transfer error:', error);
-                toast({
-                  title: "Transfer failed",
-                  description: "Failed to process transfer",
-                  variant: "destructive"
-                });
-              } finally {
-                setIsTransferLoading(false);
-              }
-            }}
-          />
+                try {
+                  setIsTransferLoading(true);
+                  
+                  const newTransaction = await databaseService.createTransaction({
+                    user_id: user.id,
+                    date: new Date().toISOString().split('T')[0],
+                    type: 'debit',
+                    amount: transfer.amount,
+                    currency: 'USD',
+                    status: 'pending',
+                    description: `Transfer to ${transfer.recipientName}`,
+                    recipient_name: transfer.recipientName,
+                    bank_name: transfer.bankName,
+                    metadata: {
+                      bankName: transfer.bankName,
+                      swiftCode: transfer.swiftCode
+                    }
+                  });
+                  
+                  setTransactions(prev => [newTransaction, ...prev]);
+                  const newBalance = balance - transfer.amount;
+                  setBalance(newBalance);
+                  await updateUser({ balance: newBalance });
+                  
+                  // Send notification
+                  await databaseService.createNotification({
+                    user_id: user.id,
+                    title: 'Transfer Initiated',
+                    message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
+                    type: 'transfer',
+                    read: false,
+                    created_at: ""
+                  });
+                  
+                  setSuccessModal({
+                    isOpen: true,
+                    title: "Transfer Initiated!",
+                    message: `Your transfer to ${transfer.recipientName} at ${transfer.bankName} is being processed.`,
+                    amount: formatCurrency(transfer.amount, 'USD')
+                  });
+                } catch (error) {
+                  console.error('Transfer error:', error);
+                  toast({
+                    title: "Transfer failed",
+                    description: "Failed to process transfer",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setIsTransferLoading(false);
+                }
+              }}
+              isUserActive={user?.isActive || false}
+            />
+          </div>
         );
 
       case 'withdraw':
         return (
-          <div className="max-w-xl mx-auto">
-            <div className="bg-card rounded-2xl border border-border p-8">
-              <h3 className="font-bold text-xl mb-6">{t('dashboard.withdraw')}</h3>
-              <form onSubmit={handleWithdraw} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">{t('dashboard.withdrawAmount')}</label>
-                  <Input 
-                    type="number"
-                    value={withdrawForm.amount}
-                    onChange={(e) => setWithdrawForm({...withdrawForm, amount: e.target.value})}
-                    placeholder="0.00"
-                    required
-                    min="1"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">{t('dashboard.destination')}</label>
-                  <select 
-                    value={withdrawForm.destination}
-                    onChange={(e) => setWithdrawForm({...withdrawForm, destination: e.target.value})}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  >
-                    <option value="bank">{t('dashboard.bankAccount')}</option>
-                    <option value="card">{t('dashboard.card')}</option>
-                  </select>
-                </div>
-
-                {/* Bank Details Form */}
-                {withdrawForm.destination === 'bank' && (
-                  <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
-                    <h4 className="font-medium text-sm text-muted-foreground">Bank Account Details</h4>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Bank Name</label>
-                      <Input 
-                        value={withdrawForm.bankName}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
-                        placeholder="Enter bank name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Account Holder Name</label>
-                      <Input 
-                        value={withdrawForm.accountHolderName}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, accountHolderName: e.target.value})}
-                        placeholder="Enter account holder name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Account Number</label>
-                      <Input 
-                        value={withdrawForm.accountNumber}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
-                        placeholder="Enter account number"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Routing Number</label>
-                      <Input 
-                        value={withdrawForm.routingNumber}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, routingNumber: e.target.value})}
-                        placeholder="Enter routing number"
-                        required
-                      />
-                    </div>
+          <div className="space-y-6">
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Withdrawals Disabled</AlertTitle>
+                <AlertDescription>
+                  Withdrawals are disabled while your account is suspended. Please contact support to reactivate your account.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="max-w-xl mx-auto">
+              <div className="bg-card rounded-2xl border border-border p-8">
+                <h3 className="font-bold text-xl mb-6">{t('dashboard.withdraw')}</h3>
+                <form onSubmit={handleWithdraw} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{t('dashboard.withdrawAmount')}</label>
+                    <Input 
+                      type="number"
+                      value={withdrawForm.amount}
+                      onChange={(e) => setWithdrawForm({...withdrawForm, amount: e.target.value})}
+                      placeholder="0.00"
+                      required
+                      min="1"
+                      step="0.01"
+                      disabled={!user?.isActive}
+                    />
                   </div>
-                )}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{t('dashboard.destination')}</label>
+                    <select 
+                      value={withdrawForm.destination}
+                      onChange={(e) => setWithdrawForm({...withdrawForm, destination: e.target.value})}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      disabled={!user?.isActive}
+                    >
+                      <option value="bank">{t('dashboard.bankAccount')}</option>
+                      <option value="card">{t('dashboard.card')}</option>
+                    </select>
+                  </div>
 
-                {/* Card Details Form */}
-                {withdrawForm.destination === 'card' && (
-                  <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
-                    <h4 className="font-medium text-sm text-muted-foreground">Card Details</h4>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Cardholder Name</label>
-                      <Input 
-                        value={withdrawForm.cardHolderName}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, cardHolderName: e.target.value})}
-                        placeholder="Enter name on card"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Card Number</label>
-                      <Input 
-                        value={withdrawForm.cardNumber}
-                        onChange={(e) => setWithdrawForm({...withdrawForm, cardNumber: e.target.value})}
-                        placeholder="1234 5678 9012 3456"
-                        maxLength={19}
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                  {/* Bank Details Form */}
+                  {withdrawForm.destination === 'bank' && (
+                    <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
+                      <h4 className="font-medium text-sm text-muted-foreground">Bank Account Details</h4>
                       <div>
-                        <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                        <label className="block text-sm font-medium mb-2">Bank Name</label>
                         <Input 
-                          value={withdrawForm.expiryDate}
-                          onChange={(e) => setWithdrawForm({...withdrawForm, expiryDate: e.target.value})}
-                          placeholder="MM/YY"
-                          maxLength={5}
+                          value={withdrawForm.bankName}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
+                          placeholder="Enter bank name"
                           required
+                          disabled={!user?.isActive}
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2">CVV</label>
+                        <label className="block text-sm font-medium mb-2">Account Holder Name</label>
                         <Input 
-                          type="password"
-                          value={withdrawForm.cvv}
-                          onChange={(e) => setWithdrawForm({...withdrawForm, cvv: e.target.value})}
-                          placeholder="***"
-                          maxLength={4}
+                          value={withdrawForm.accountHolderName}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, accountHolderName: e.target.value})}
+                          placeholder="Enter account holder name"
                           required
+                          disabled={!user?.isActive}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Account Number</label>
+                        <Input 
+                          value={withdrawForm.accountNumber}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
+                          placeholder="Enter account number"
+                          required
+                          disabled={!user?.isActive}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Routing Number</label>
+                        <Input 
+                          value={withdrawForm.routingNumber}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, routingNumber: e.target.value})}
+                          placeholder="Enter routing number"
+                          required
+                          disabled={!user?.isActive}
                         />
                       </div>
                     </div>
-                  </div>
-                )}
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
-                  disabled={isWithdrawLoading}
-                >
-                  {isWithdrawLoading ? (
-                    <LoadingSpinner size="sm" />
-                  ) : (
-                    <>
-                      <ArrowDownToLine className="w-4 h-4 mr-2" />
-                      {t('dashboard.processWithdraw')}
-                    </>
                   )}
-                </Button>
-              </form>
+
+                  {/* Card Details Form */}
+                  {withdrawForm.destination === 'card' && (
+                    <div className="space-y-4 p-4 bg-secondary/30 rounded-xl">
+                      <h4 className="font-medium text-sm text-muted-foreground">Card Details</h4>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Cardholder Name</label>
+                        <Input 
+                          value={withdrawForm.cardHolderName}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, cardHolderName: e.target.value})}
+                          placeholder="Enter name on card"
+                          required
+                          disabled={!user?.isActive}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Card Number</label>
+                        <Input 
+                          value={withdrawForm.cardNumber}
+                          onChange={(e) => setWithdrawForm({...withdrawForm, cardNumber: e.target.value})}
+                          placeholder="1234 5678 9012 3456"
+                          maxLength={19}
+                          required
+                          disabled={!user?.isActive}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                          <Input 
+                            value={withdrawForm.expiryDate}
+                            onChange={(e) => setWithdrawForm({...withdrawForm, expiryDate: e.target.value})}
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            required
+                            disabled={!user?.isActive}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">CVV</label>
+                          <Input 
+                            type="password"
+                            value={withdrawForm.cvv}
+                            onChange={(e) => setWithdrawForm({...withdrawForm, cvv: e.target.value})}
+                            placeholder="***"
+                            maxLength={4}
+                            required
+                            disabled={!user?.isActive}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+                    disabled={isWithdrawLoading || !user?.isActive}
+                  >
+                    {isWithdrawLoading ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <>
+                        <ArrowDownToLine className="w-4 h-4 mr-2" />
+                        {user?.isActive ? t('dashboard.processWithdraw') : 'Withdrawals Disabled'}
+                      </>
+                    )}
+                  </Button>
+                  
+                  {!user?.isActive && (
+                    <p className="text-center text-sm text-muted-foreground">
+                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                      Withdrawals are disabled for suspended accounts
+                    </p>
+                  )}
+                </form>
+              </div>
             </div>
           </div>
         );
@@ -994,6 +1176,16 @@ const Dashboard = () => {
       case 'savings':
         return (
           <div className="space-y-6">
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Savings View Only</AlertTitle>
+                <AlertDescription>
+                  You can view your savings goals but cannot make new contributions while your account is suspended.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-gradient-to-br from-accent to-accent/70 p-6 rounded-2xl text-accent-foreground">
                 <p className="text-accent-foreground/80 text-sm">{t('dashboard.savingsBalance')}</p>
@@ -1067,14 +1259,30 @@ const Dashboard = () => {
       case 'cards':
         return (
           <div className="space-y-6">
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Cards View Only</AlertTitle>
+                <AlertDescription>
+                  You can view your cards but cannot request new cards or change card status while your account is suspended.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-xl">{t('dashboard.cards')}</h3>
               <div className="flex items-center gap-2">
                 {isLoading.cards && <LoadingSpinner size="sm" />}
                 <Button 
                   className="bg-accent hover:bg-accent/90 text-accent-foreground"
-                  onClick={() => setShowNewCardModal(true)}
-                  disabled={isLoading.cards}
+                  onClick={() => {
+                    if (!user?.isActive) {
+                      checkUserActive('request new cards');
+                    } else {
+                      setShowNewCardModal(true);
+                    }
+                  }}
+                  disabled={isLoading.cards || !user?.isActive}
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Request New Card
@@ -1095,8 +1303,13 @@ const Dashboard = () => {
                       card.status === 'frozen' 
                         ? 'bg-gradient-to-br from-gray-500 to-gray-700 opacity-75' 
                         : 'bg-gradient-to-br from-primary to-navy-light'
-                    }`}
+                    } ${!user?.isActive ? 'opacity-80' : ''}`}
                   >
+                    {!user?.isActive && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10">
+                        <Lock className="w-8 h-8" />
+                      </div>
+                    )}
                     <div className="absolute top-4 right-4">
                       <CreditCard className="w-8 h-8 opacity-50" />
                     </div>
@@ -1120,7 +1333,14 @@ const Dashboard = () => {
                         className={`border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 ${
                           card.status === 'frozen' ? 'border-blue-300 text-blue-200' : ''
                         }`}
-                        onClick={() => toggleCardStatus(card.id)}
+                        onClick={() => {
+                          if (!user?.isActive) {
+                            checkUserActive('manage cards');
+                          } else {
+                            toggleCardStatus(card.id);
+                          }
+                        }}
+                        disabled={!user?.isActive}
                       >
                         {card.status === 'active' ? (
                           <>
@@ -1267,7 +1487,13 @@ const Dashboard = () => {
                 <div>
                   <p className="font-medium text-lg">{user?.firstName} {user?.lastName}</p>
                   <p className="text-muted-foreground text-sm">Click the camera icon to upload a new photo</p>
-                  <p className="text-muted-foreground text-xs mt-1">Maximum file size: 5MB</p>
+                  <p className="text-xs text-muted-foreground mt-1">Maximum file size: 5MB</p>
+                  {!user?.isActive && (
+                    <div className="flex items-center gap-1 mt-2 text-sm text-yellow-600">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Account Status: Suspended</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1643,6 +1869,16 @@ const Dashboard = () => {
       case 'support':
         return (
           <div className="space-y-6">
+            {!user?.isActive && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Need Help Reactivating?</AlertTitle>
+                <AlertDescription>
+                  Please contact our support team to reactivate your suspended account.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="bg-card rounded-2xl border border-border p-8">
               <h3 className="font-bold text-xl mb-6">{t('dashboard.helpCenter')}</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -1657,6 +1893,31 @@ const Dashboard = () => {
                   <span className="text-sm text-muted-foreground">Get help from our team</span>
                 </Button>
               </div>
+              
+              {!user?.isActive && (
+                <div className="mt-8 p-6 bg-accent/5 border border-accent/20 rounded-xl">
+                  <div className="flex items-start gap-4">
+                    <AlertCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
+                    <div>
+                      <h4 className="font-semibold text-lg mb-2">Account Reactivation</h4>
+                      <p className="text-muted-foreground mb-4">
+                        If your account has been suspended and you believe this is an error, 
+                        please contact our support team immediately for assistance with reactivation.
+                      </p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div>
+                          <p className="font-medium">Support Email</p>
+                          <p className="text-accent">support@ronstonebank.com</p>
+                        </div>
+                        <div>
+                          <p className="font-medium">Support Phone</p>
+                          <p className="text-accent">1-800-555-1234</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1666,153 +1927,162 @@ const Dashboard = () => {
     }
   };
 
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
-
+  // Wrap the entire dashboard with ActiveUserGuard
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform lg:translate-x-0 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="p-6">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-accent to-gold-light rounded-lg flex items-center justify-center">
-              <span className="text-primary font-bold text-xl">RS</span>
-            </div>
-            <span className="text-lg font-bold">Ron Stone Bank</span>
-          </Link>
-        </div>
-
-        <nav className="px-4 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveSection(item.id as DashboardSection);
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${
-                  activeSection === item.id 
-                    ? 'bg-accent text-accent-foreground' 
-                    : 'text-muted-foreground hover:bg-secondary'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>{t('nav.logout')}</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="flex-1 lg:ml-64">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden"
-              >
-                {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-              <h1 className="text-xl font-bold">{t('dashboard.welcome')}, {user.firstName}!</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <button
-                onClick={toggleTheme}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors"
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <LanguageSelector />
-              <button 
-                onClick={() => {
-                  setActiveSection('notifications');
-                  // Mark all as read when clicking bell
-                  notifications.forEach(async (n) => {
-                    if (!n.read) {
-                      await markNotificationAsRead(n.id);
-                    }
-                  });
-                }}
-                className="relative p-2 hover:bg-secondary rounded-lg transition-colors"
-              >
-                <Bell className="w-5 h-5" />
-                {notifications.some(n => !n.read) && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                )}
-              </button>
-              <button 
-                onClick={() => setActiveSection('profile')}
-                className="flex items-center space-x-2"
-              >
-                {profilePicture ? (
-                  <img 
-                    src={profilePicture} 
-                    alt="Profile" 
-                    className="w-8 h-8 rounded-full object-cover border-2 border-accent/30 hover:border-accent transition-colors"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center hover:scale-105 transition-transform">
-                    <span className="text-sm font-bold text-accent-foreground">
-                      {user.firstName[0]}{user.lastName[0]}
-                    </span>
-                  </div>
-                )}
-              </button>
-            </div>
+    <ActiveUserGuard requireActive={false}> {/* Set to false to allow viewing even when inactive */}
+      <div className="min-h-screen bg-background flex">
+        {/* Sidebar */}
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform lg:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="p-6">
+            <Link to="/" className="flex items-center space-x-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-accent to-gold-light rounded-lg flex items-center justify-center">
+                <span className="text-primary font-bold text-xl">RS</span>
+              </div>
+              <span className="text-lg font-bold">Ron Stone Bank</span>
+            </Link>
           </div>
-        </header>
 
-        {/* Page Content */}
-        <main className="p-6">
-          {renderContent()}
-        </main>
-      </div>
+          <nav className="px-4 space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveSection(item.id as DashboardSection);
+                    setSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-colors ${
+                    activeSection === item.id 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'text-muted-foreground hover:bg-secondary'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                  {!user?.isActive && ['transfer', 'withdraw', 'cards', 'savings'].includes(item.id) && (
+                    <Lock className="w-3 h-3 ml-auto opacity-50" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
 
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>{t('nav.logout')}</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 lg:ml-64">
+          {/* Top Bar */}
+          <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="lg:hidden"
+                >
+                  {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold">{t('dashboard.welcome')}, {user?.firstName}!</h1>
+                  {!user?.isActive && (
+                    <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-600 rounded-full flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Suspended
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                >
+                  {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                </button>
+                <LanguageSelector />
+                <button 
+                  onClick={() => {
+                    setActiveSection('notifications');
+                    // Mark all as read when clicking bell
+                    notifications.forEach(async (n) => {
+                      if (!n.read) {
+                        await markNotificationAsRead(n.id);
+                      }
+                    });
+                  }}
+                  className="relative p-2 hover:bg-secondary rounded-lg transition-colors"
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.some(n => !n.read) && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </button>
+                <button 
+                  onClick={() => setActiveSection('profile')}
+                  className="flex items-center space-x-2"
+                >
+                  {profilePicture ? (
+                    <img 
+                      src={profilePicture} 
+                      alt="Profile" 
+                      className="w-8 h-8 rounded-full object-cover border-2 border-accent/30 hover:border-accent transition-colors"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-accent rounded-full flex items-center justify-center hover:scale-105 transition-transform">
+                      <span className="text-sm font-bold text-accent-foreground">
+                        {user?.firstName[0]}{user?.lastName[0]}
+                      </span>
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Page Content */}
+          <main className="p-6">
+            {renderContent()}
+          </main>
+        </div>
+
+        {/* Mobile Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Success Modal */}
+        <SuccessModal
+          isOpen={successModal.isOpen}
+          onClose={() => setSuccessModal({ ...successModal, isOpen: false })}
+          title={successModal.title}
+          message={successModal.message}
+          amount={successModal.amount}
         />
-      )}
 
-      {/* Success Modal */}
-      <SuccessModal
-        isOpen={successModal.isOpen}
-        onClose={() => setSuccessModal({ ...successModal, isOpen: false })}
-        title={successModal.title}
-        message={successModal.message}
-        amount={successModal.amount}
-      />
-
-      {/* Withdraw PIN Verification Modal */}
-      <PinVerificationModal
-        isOpen={showWithdrawPinModal}
-        onClose={() => setShowWithdrawPinModal(false)}
-        onVerified={handleWithdrawPinVerified}
-        title="Verify Withdrawal"
-        description="Enter your PIN to authorize this withdrawal"
-      />
-    </div>
+        {/* Withdraw PIN Verification Modal */}
+        <PinVerificationModal
+          isOpen={showWithdrawPinModal}
+          onClose={() => setShowWithdrawPinModal(false)}
+          onVerified={handleWithdrawPinVerified}
+          title="Verify Withdrawal"
+          description="Enter your PIN to authorize this withdrawal"
+        />
+      </div>
+    </ActiveUserGuard>
   );
 };
 

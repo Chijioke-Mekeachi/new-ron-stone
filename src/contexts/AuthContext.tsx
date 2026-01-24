@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -16,6 +17,7 @@ interface User {
   employment?: any;
   identification?: any;
   transactionPin?: string;
+  isActive: boolean; // Added this field
 }
 
 interface AuthContextType {
@@ -86,6 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           employment: data.employment,
           identification: data.identification,
           transactionPin: data.transaction_pin,
+          isActive: data.is_active, // Added this line
         };
         setUser(userData);
       }
@@ -118,6 +121,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       if (data.user) {
+        // Create profile with is_active set to true by default for new users
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: email,
+            first_name: firstName,
+            last_name: lastName,
+            account_number: Math.floor(1000000000 + Math.random() * 9000000000).toString(),
+            balance: 0,
+            currency: 'USD',
+            is_active: true, // Default to active for new users
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (profileError) throw profileError;
+
         return { success: true };
       }
 
@@ -142,6 +163,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (data.user) {
         await fetchUserProfile(data.user.id);
+        
+        // Check if user is active
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (!profile?.is_active) {
+          toast({
+            title: "Account Suspended",
+            description: "Your account is currently suspended. Please contact support.",
+            variant: "destructive"
+          });
+        }
+        
         return { success: true };
       }
 
@@ -159,7 +196,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateBalance = async (amount: number) => {
-    if (!user) return;
+    if (!user || !user.isActive) return;
 
     try {
       const newBalance = user.balance + amount;
@@ -177,6 +214,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser({ ...user, balance: newBalance });
     } catch (error) {
       console.error('Error updating balance:', error);
+      throw error;
     }
   };
 
@@ -198,6 +236,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (updates.employment !== undefined) updateData.employment = updates.employment;
       if (updates.identification !== undefined) updateData.identification = updates.identification;
       if (updates.transactionPin !== undefined) updateData.transaction_pin = updates.transactionPin;
+      if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
       const { error } = await supabase
         .from('profiles')
@@ -209,6 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser({ ...user, ...updates });
     } catch (error) {
       console.error('Error updating user:', error);
+      throw error;
     }
   };
 

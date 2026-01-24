@@ -20,6 +20,7 @@ import PinVerificationModal from "./PinVerificationModal";
 interface TransferFormProps {
   balance: number;
   onTransferComplete: (transaction: {
+    swiftCode: any;
     recipientName: string;
     amount: number;
     bankName: string;

@@ -16,6 +16,7 @@ export interface Transaction {
 }
 
 export interface Card {
+  number: any;
   id: string;
   type: 'Virtual' | 'Physical';
   last_four: string;
