@@ -35,7 +35,8 @@ import {
   AlertCircle,
   Lock
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+// Fixed import - using sonner directly
+import { toast } from "sonner";
 import SuccessModal from "@/components/SuccessModal";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import TransactionExport from "@/components/dashboard/TransactionExport";
@@ -45,6 +46,7 @@ import TransactionPinSetup from "@/components/dashboard/TransactionPinSetup";
 import PinVerificationModal from "@/components/dashboard/PinVerificationModal";
 import { ActiveUserGuard } from "@/components/ActiveUserGuard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Toaster } from "sonner";
 
 type DashboardSection = 'overview' | 'transactions' | 'transfer' | 'withdraw' | 'savings' | 'cards' | 'profile' | 'notifications' | 'support';
 
@@ -146,10 +148,9 @@ const Dashboard = () => {
   // Helper function to check if user can perform actions
   const checkUserActive = (actionName: string = 'perform this action'): boolean => {
     if (!user?.isActive) {
-      toast({
-        title: "Account Suspended",
+      // Use toast with sonner's API
+      toast.error("Account Suspended", {
         description: `Your account is currently suspended. Please contact support to ${actionName}.`,
-        variant: "destructive",
         duration: 5000,
       });
       return false;
@@ -199,10 +200,8 @@ const Dashboard = () => {
       setNotifications(notificationsData);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to fetch data",
-        variant: "destructive"
       });
     } finally {
       setIsLoading({
@@ -221,10 +220,8 @@ const Dashboard = () => {
 
     try {
       if (file.size > 5 * 1024 * 1024) {
-        toast({ 
-          title: "File too large", 
-          description: "Please select an image under 5MB", 
-          variant: "destructive" 
+        toast.error("File too large", { 
+          description: "Please select an image under 5MB",
         });
         return;
       }
@@ -235,16 +232,13 @@ const Dashboard = () => {
       await updateUser({ profilePicture: publicUrl });
       setProfilePicture(publicUrl);
       
-      toast({ 
-        title: "Profile picture updated!", 
+      toast.success("Profile picture updated!", { 
         description: "Your new profile picture has been saved." 
       });
     } catch (error) {
       console.error('Error uploading profile picture:', error);
-      toast({
-        title: "Upload failed",
+      toast.error("Upload failed", {
         description: "Failed to upload profile picture",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(prev => ({ ...prev, profile: false }));
@@ -281,16 +275,13 @@ const Dashboard = () => {
 
       await updateUser(updates);
       
-      toast({
-        title: "Profile updated!",
+      toast.success("Profile updated!", {
         description: "Your profile information has been saved."
       });
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: "Update failed",
+      toast.error("Update failed", {
         description: "Failed to update profile information",
-        variant: "destructive"
       });
     } finally {
       setIsLoading(prev => ({ ...prev, profile: false }));
@@ -330,7 +321,7 @@ const Dashboard = () => {
 
     const amount = parseFloat(transferForm.amount);
     if (amount > balance) {
-      toast({ title: "Insufficient funds", variant: "destructive" });
+      toast.error("Insufficient funds");
       return;
     }
 
@@ -388,10 +379,8 @@ const Dashboard = () => {
       });
     } catch (error) {
       console.error('Transfer error:', error);
-      toast({
-        title: "Transfer failed",
+      toast.error("Transfer failed", {
         description: "Failed to process transfer",
-        variant: "destructive"
       });
     } finally {
       setIsTransferLoading(false);
@@ -408,11 +397,11 @@ const Dashboard = () => {
     
     const amount = parseFloat(withdrawForm.amount);
     if (amount > balance) {
-      toast({ title: "Insufficient funds", variant: "destructive" });
+      toast.error("Insufficient funds");
       return;
     }
     if (amount <= 0) {
-      toast({ title: "Please enter a valid amount", variant: "destructive" });
+      toast.error("Please enter a valid amount");
       return;
     }
 
@@ -488,10 +477,8 @@ const Dashboard = () => {
       });
     } catch (error) {
       console.error('Withdrawal error:', error);
-      toast({
-        title: "Withdrawal failed",
+      toast.error("Withdrawal failed", {
         description: "Failed to process withdrawal",
-        variant: "destructive"
       });
     } finally {
       setIsWithdrawLoading(false);
@@ -529,16 +516,13 @@ const Dashboard = () => {
         created_at: ""
       });
 
-      toast({
-        title: newStatus === 'frozen' ? "Card Frozen" : "Card Activated",
-        description: `Your card has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`
+      toast.success(newStatus === 'frozen' ? "Card Frozen" : "Card Activated", {
+        description: `Your card has been ${newStatus === 'frozen' ? 'frozen' : 'activated'}.`,
       });
     } catch (error) {
       console.error('Error updating card status:', error);
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to update card status",
-        variant: "destructive"
       });
     }
   };
@@ -586,16 +570,13 @@ const Dashboard = () => {
         created_at: ""
       });
 
-      toast({
-        title: "Card Requested",
-        description: `Your new ${newCardType} card has been requested and will be ready shortly.`
+      toast.success("Card Requested", {
+        description: `Your new ${newCardType} card has been requested and will be ready shortly.`,
       });
     } catch (error) {
       console.error('Error requesting card:', error);
-      toast({
-        title: "Request failed",
+      toast.error("Request failed", {
         description: "Failed to request new card",
-        variant: "destructive"
       });
     }
   };
@@ -989,10 +970,8 @@ const Dashboard = () => {
                   });
                 } catch (error) {
                   console.error('Transfer error:', error);
-                  toast({
-                    title: "Transfer failed",
+                  toast.error("Transfer failed", {
                     description: "Failed to process transfer",
-                    variant: "destructive"
                   });
                 } finally {
                   setIsTransferLoading(false);
@@ -1929,8 +1908,20 @@ const Dashboard = () => {
 
   // Wrap the entire dashboard with ActiveUserGuard
   return (
-    <ActiveUserGuard requireActive={false}> {/* Set to false to allow viewing even when inactive */}
+    <ActiveUserGuard requireActive={false}>
       <div className="min-h-screen bg-background flex">
+        {/* Toaster component for toast notifications */}
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+              color: theme === 'dark' ? '#ffffff' : '#000000',
+              border: `1px solid ${theme === 'dark' ? '#333333' : '#e5e5e5'}`,
+            },
+          }}
+        />
+        
         {/* Sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
