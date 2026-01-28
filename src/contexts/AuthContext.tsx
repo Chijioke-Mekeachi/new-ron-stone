@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
 interface User {
@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const signupLockRef = useRef(false);
   const signupAttemptsRef = useRef<{ [key: string]: number }>({});
+  const isLoggingOutRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -54,7 +55,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (error) {
           console.error('Error getting session:', error);
           
-          // If there's a refresh token error, clear auth state
           if (error.message?.includes('Invalid Refresh Token')) {
             console.log('Clearing invalid refresh token...');
             await supabase.auth.signOut();
@@ -91,10 +91,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           break;
           
         case 'SIGNED_OUT':
-          setUser(null);
-          setIsLoading(false);
-          // Clear any stored signup attempts on logout
-          signupAttemptsRef.current = {};
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+            signupAttemptsRef.current = {};
+            isLoggingOutRef.current = false;
+          }
           break;
           
         case 'USER_UPDATED':
@@ -105,7 +107,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           break;
           
         case 'INITIAL_SESSION':
-          // Session initialized
           break;
           
         default:
@@ -131,7 +132,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        // Profile not found
         if (error.code === 'PGRST116') {
           if (retryCount < MAX_RETRIES) {
             console.log(`Profile not found for ${userId}, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
@@ -181,7 +181,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     firstName: string,
     lastName: string
   ): Promise<{ success: boolean; error?: string }> => {
-    // Prevent concurrent signups
     if (signupLockRef.current) {
       return { 
         success: false, 
@@ -189,11 +188,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
     }
 
-    // Rate limiting by IP and email (simple client-side)
     const now = Date.now();
     const oneHourAgo = now - 3600000;
     
-    // Clean old attempts
     Object.keys(signupAttemptsRef.current).forEach(key => {
       if (parseInt(key) < oneHourAgo) {
         delete signupAttemptsRef.current[key];
@@ -210,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
     }
 
-    // Track this attempt
     signupAttemptsRef.current[now.toString()] = (signupAttemptsRef.current[now.toString()] || 0) + 1;
 
     signupLockRef.current = true;
@@ -219,7 +215,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log(`Signup attempt for: ${email}`);
 
-      // Clear any existing session first
       try {
         await supabase.auth.signOut();
       } catch (err) {
@@ -240,7 +235,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) {
-        // Handle rate limit error
         if (error.status === 429) {
           toast.error('Too many requests. Please wait 30 minutes before trying again.');
           return { 
@@ -249,7 +243,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle already registered
         if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
           toast.error('This email is already registered. Try logging in instead.');
           return { 
@@ -258,7 +251,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle invalid email
         if (error.message?.includes('Invalid email')) {
           toast.error('Please enter a valid email address.');
           return { 
@@ -267,7 +259,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle weak password
         if (error.message?.includes('password')) {
           toast.error('Password must be at least 6 characters long.');
           return { 
@@ -276,14 +267,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle refresh token error
         if (error.message?.includes('Invalid Refresh Token')) {
           console.log('Refresh token error during signup, clearing auth state');
           try {
             await supabase.auth.signOut();
-          } catch (e) {
-            // Ignore signout errors
-          }
+          } catch (e) {}
           
           toast.error('Session error. Please try again.');
           return { 
@@ -292,7 +280,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Generic error
         console.error('Signup error:', error);
         toast.error('Signup failed. Please try again.');
         return { 
@@ -302,19 +289,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
-        // Show success message
         if (data.session) {
-          // Auto-confirmed (email confirmations disabled)
           toast.success('Account created successfully!');
         } else {
-          // Email confirmation required
           toast.success('Check your email to confirm your account.');
         }
 
-        // Wait for database trigger to create profile
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // If auto-signed in, fetch profile
         if (data.session) {
           setSession(data.session);
           await fetchUserProfile(data.user.id);
@@ -344,7 +326,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error: 'An unexpected error occurred. Please try again.' 
       };
     } finally {
-      // Reset signup lock with delay
       setTimeout(() => {
         signupLockRef.current = false;
         setIsSigningUp(false);
@@ -363,7 +344,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) {
-        // Handle rate limiting
         if (error.status === 429) {
           toast.error('Too many login attempts. Please wait before trying again.');
           return { 
@@ -372,7 +352,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle invalid credentials
         if (error.message?.includes('Invalid login credentials')) {
           toast.error('Email or password is incorrect.');
           return { 
@@ -381,7 +360,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle email not confirmed
         if (error.message?.includes('Email not confirmed')) {
           toast.error('Please check your email to confirm your account.');
           return { 
@@ -390,14 +368,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Handle refresh token error
         if (error.message?.includes('Invalid Refresh Token')) {
           console.log('Refresh token error during login');
           try {
             await supabase.auth.signOut();
-          } catch (e) {
-            // Ignore
-          }
+          } catch (e) {}
           
           toast.error('Session error. Please refresh the page and try again.');
           return { 
@@ -406,7 +381,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
         }
         
-        // Generic error
         console.error('Login error:', error);
         toast.error('Login failed. Please try again.');
         return { success: false, error: error.message };
@@ -415,7 +389,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (data.user) {
         await fetchUserProfile(data.user.id);
         
-        // Check if user is active
         const { data: profile } = await supabase
           .from('profiles')
           .select('is_active')
@@ -444,14 +417,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    if (isLoggingOutRef.current) {
+      console.log('Logout already in progress');
+      return;
+    }
+
+    isLoggingOutRef.current = true;
+    
     try {
-      await supabase.auth.signOut();
+      console.log('Starting logout process...');
+      
+      // Clear local state first for immediate UI feedback
       setUser(null);
       setSession(null);
-      toast.success('Logged out successfully');
+      
+      // Clear any auth-related localStorage items
+      if (typeof window !== 'undefined') {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.includes('supabase') || 
+            key.includes('auth') || 
+            key.includes('sb-') || 
+            key.includes('session')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+        });
+        
+        // Also clear sessionStorage
+        sessionStorage.clear();
+      }
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        toast.error('Error during server logout, but local session was cleared.');
+      } else {
+        console.log('Logout successful');
+        toast.success('Logged out successfully');
+      }
+      
+      // Ensure loading state is reset
+      setIsLoading(false);
+      
     } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Error logging out');
+      console.error('Unexpected logout error:', error);
+      
+      // Force clear everything on error
+      setUser(null);
+      setSession(null);
+      setIsLoading(false);
+      
+      toast.error('Error during logout. Please refresh the page.');
+      
+    } finally {
+      // Reset the logout lock after a delay
+      setTimeout(() => {
+        isLoggingOutRef.current = false;
+      }, 1000);
     }
   };
 
