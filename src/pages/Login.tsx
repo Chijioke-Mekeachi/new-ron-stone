@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,15 +14,24 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const { session } = useAuth();
+
+  useEffect(() => {
+    if (session) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [session, navigate]);
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email.trim() || !email.includes("@")) {
       toast({
         title: "Error",
@@ -45,7 +54,7 @@ const Login = () => {
 
     try {
       const result = await login(email, password);
-      
+
       if (result.success) {
         toast({
           title: "Success",
@@ -76,7 +85,7 @@ const Login = () => {
       <div className="absolute top-4 right-4">
         <LanguageSelector />
       </div>
-      
+
       <div className="w-full max-w-md">
         <div className="bg-card border border-border rounded-2xl p-8 shadow-elegant">
           <div className="flex items-center justify-center space-x-2 mb-8">
@@ -137,8 +146,8 @@ const Login = () => {
                 </button>
               </div>
               <div className="flex justify-end mt-2">
-                <Link 
-                  to="/forgot-password" 
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-accent hover:underline"
                 >
                   {t('auth.forgotPassword')}
@@ -146,8 +155,8 @@ const Login = () => {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-12 bg-accent hover:bg-accent/90 text-accent-foreground"
               disabled={isLoading}
             >
@@ -158,15 +167,15 @@ const Login = () => {
               )}
             </Button>
           </form>
-          </div>
-          <p className="text-center text-muted-foreground mt-8">
-            {t('auth.noAccount')}{' '}
-            <Link to="/signup" className="text-accent hover:underline">
-              {t('auth.signupLink')}
-            </Link>
-          </p>
         </div>
+        <p className="text-center text-muted-foreground mt-8">
+          {t('auth.noAccount')}{' '}
+          <Link to="/signup" className="text-accent hover:underline">
+            {t('auth.signupLink')}
+          </Link>
+        </p>
       </div>
+    </div>
   );
 };
 
